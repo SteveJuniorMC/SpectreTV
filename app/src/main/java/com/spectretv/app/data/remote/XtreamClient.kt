@@ -147,6 +147,7 @@ class XtreamClient @Inject constructor(
 
             seriesList.mapNotNull { series ->
                 series.seriesId?.let { seriesId ->
+                    val releaseYear = (series.releaseDate ?: series.releaseDateAlt)?.take(4)
                     Series(
                         id = "${source.id}_series_$seriesId",
                         name = series.name ?: "Unknown",
@@ -155,7 +156,7 @@ class XtreamClient @Inject constructor(
                         backdropUrl = series.backdropPath?.firstOrNull(),
                         plot = series.plot,
                         genre = categoryMap[series.categoryId] ?: "Uncategorized",
-                        year = series.releaseDate?.take(4),
+                        year = releaseYear,
                         rating = series.rating,
                         sourceId = source.id
                     )

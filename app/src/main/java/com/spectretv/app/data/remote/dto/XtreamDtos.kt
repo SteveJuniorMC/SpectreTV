@@ -99,9 +99,9 @@ data class XtreamVodStream(
     val rating: String?,
     @SerializedName("rating_5based")
     val rating5Based: Double?,
-    // Series specific
+    // Series specific - use Any to handle both Int and String from different providers
     @SerializedName("series_id")
-    val seriesId: Int?,
+    val seriesIdRaw: Any?,
     @SerializedName("cover")
     val cover: String?,
     @SerializedName("plot")
@@ -114,11 +114,21 @@ data class XtreamVodStream(
     val genre: String?,
     @SerializedName("releaseDate")
     val releaseDate: String?,
+    @SerializedName("release_date")
+    val releaseDateAlt: String?,
     @SerializedName("last_modified")
     val lastModified: String?,
     @SerializedName("backdrop_path")
     val backdropPath: List<String>?
-)
+) {
+    // Helper to get series_id as Int regardless of how provider returns it
+    val seriesId: Int?
+        get() = when (seriesIdRaw) {
+            is Number -> seriesIdRaw.toInt()
+            is String -> seriesIdRaw.toIntOrNull()
+            else -> null
+        }
+}
 
 data class XtreamVodInfo(
     @SerializedName("info")

@@ -1,7 +1,10 @@
 package com.spectretv.app.presentation.screens.player
 
 import androidx.lifecycle.ViewModel
+import com.spectretv.app.data.local.preferences.AppPreferences
+import com.spectretv.app.data.local.preferences.VideoQuality
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +30,11 @@ data class PlayerUiState(
 )
 
 @HiltViewModel
-class PlayerViewModel @Inject constructor() : ViewModel() {
+class PlayerViewModel @Inject constructor(
+    private val appPreferences: AppPreferences
+) : ViewModel() {
+
+    val videoQuality: Flow<VideoQuality> = appPreferences.videoQuality
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()

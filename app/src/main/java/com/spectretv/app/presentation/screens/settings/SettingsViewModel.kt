@@ -2,6 +2,8 @@ package com.spectretv.app.presentation.screens.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.spectretv.app.data.local.preferences.AppPreferences
+import com.spectretv.app.data.local.preferences.VideoQuality
 import com.spectretv.app.domain.model.Source
 import com.spectretv.app.domain.model.SourceType
 import com.spectretv.app.domain.repository.ChannelRepository
@@ -9,8 +11,10 @@ import com.spectretv.app.domain.repository.SourceRepository
 import com.spectretv.app.domain.repository.VodRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,11 +29,15 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     private val sourceRepository: SourceRepository,
     private val channelRepository: ChannelRepository,
-    private val vodRepository: VodRepository
+    private val vodRepository: VodRepository,
+    private val appPreferences: AppPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    val videoQuality: StateFlow<VideoQuality> = appPreferences.videoQuality
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), VideoQuality.AUTO)
 
     init {
         loadSources()
@@ -40,6 +48,12 @@ class SettingsViewModel @Inject constructor(
             sourceRepository.getAllSources().collect { sources ->
                 _uiState.value = _uiState.value.copy(sources = sources)
             }
+        }
+    }
+
+    fun setVideoQuality(quality: VideoQuality) {
+        viewModelScope.launch {
+            appPreferences.setVideoQuality(quality)
         }
     }
 

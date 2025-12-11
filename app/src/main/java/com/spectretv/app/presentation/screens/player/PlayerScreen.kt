@@ -64,6 +64,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
+import com.spectretv.app.data.local.preferences.VideoQuality
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -77,6 +78,7 @@ fun PlayerScreen(
     viewModel: PlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val videoQuality by viewModel.videoQuality.collectAsState(initial = VideoQuality.AUTO)
     val context = LocalContext.current
 
     var showControls by remember { mutableStateOf(true) }
@@ -96,6 +98,15 @@ fun PlayerScreen(
                     .setPreferredTextLanguage(Locale.getDefault().language)
             )
         }
+    }
+
+    // Apply video quality constraints
+    LaunchedEffect(videoQuality) {
+        trackSelector.setParameters(
+            trackSelector.buildUponParameters()
+                .setMaxVideoSize(Int.MAX_VALUE, videoQuality.maxHeight)
+                .setMaxVideoBitrate(videoQuality.maxBitrate)
+        )
     }
 
     val exoPlayer = remember {

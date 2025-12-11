@@ -6,11 +6,11 @@ import com.spectretv.app.domain.model.Source
 import com.spectretv.app.domain.model.SourceType
 import com.spectretv.app.domain.repository.ChannelRepository
 import com.spectretv.app.domain.repository.SourceRepository
+import com.spectretv.app.domain.repository.VodRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -24,7 +24,8 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val sourceRepository: SourceRepository,
-    private val channelRepository: ChannelRepository
+    private val channelRepository: ChannelRepository,
+    private val vodRepository: VodRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -88,7 +89,10 @@ class SettingsViewModel @Inject constructor(
                 val sourceId = sourceRepository.addSource(source)
                 val savedSource = sourceRepository.getSourceById(sourceId)
                 savedSource?.let {
+                    // Refresh all content types for Xtream sources
                     channelRepository.refreshChannels(it)
+                    vodRepository.refreshMovies(it)
+                    vodRepository.refreshSeries(it)
                 }
                 _uiState.value = _uiState.value.copy(isLoading = false)
             } catch (e: Exception) {
@@ -104,6 +108,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 channelRepository.deleteChannelsBySource(source.id)
+                vodRepository.deleteVodBySource(source.id)
                 sourceRepository.deleteSource(source)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -118,6 +123,10 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 channelRepository.refreshChannels(source)
+                if (source.type == SourceType.XTREAM) {
+                    vodRepository.refreshMovies(source)
+                    vodRepository.refreshSeries(source)
+                }
                 _uiState.value = _uiState.value.copy(isLoading = false)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(

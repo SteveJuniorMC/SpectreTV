@@ -1,4 +1,4 @@
-package com.spectretv.app.presentation.screens.search
+package com.spectretv.app.presentation.screens.live
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,32 +15,41 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,94 +62,127 @@ import com.spectretv.app.domain.model.Channel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(
+fun LiveScreen(
     onChannelClick: (Channel) -> Unit,
-    viewModel: SearchViewModel = hiltViewModel()
+    viewModel: LiveViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var showSearch by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "Search",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
+                    if (showSearch) {
+                        OutlinedTextField(
+                            value = uiState.searchQuery,
+                            onValueChange = { viewModel.setSearchQuery(it) },
+                            placeholder = { Text("Search channels...") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = {
+                                if (uiState.searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                        Icon(Icons.Default.Close, "Clear")
+                                    }
+                                }
+                            }
+                        )
+                    } else {
+                        Text(
+                            text = "Live TV",
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showSearch = !showSearch }) {
+                        Icon(
+                            imageVector = if (showSearch) Icons.Default.Close else Icons.Default.Search,
+                            contentDescription = if (showSearch) "Close search" else "Search"
+                        )
+                    }
+                    IconButton(onClick = { viewModel.toggleFavoritesFilter() }) {
+                        Icon(
+                            imageVector = if (uiState.showFavoritesOnly) Icons.Filled.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "Toggle favorites",
+                            tint = if (uiState.showFavoritesOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    IconButton(
+                        onClick = { viewModel.refreshChannels() },
+                        enabled = !uiState.isLoading
+                    ) {
+                        if (uiState.isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(Icons.Default.Refresh, "Refresh")
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Search field
-            OutlinedTextField(
-                value = uiState.query,
-                onValueChange = { viewModel.onQueryChange(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = { Text("Search channels...") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null
-                    )
-                },
-                trailingIcon = {
-                    if (uiState.query.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.clearSearch() }) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Clear"
-                            )
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                )
-            )
-
-            // Loading indicator
-            if (uiState.isSearching) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+            // Category chips
+            if (uiState.groups.isNotEmpty()) {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .size(24.dp),
-                        strokeWidth = 2.dp
-                    )
+                    items(uiState.groups) { group ->
+                        val isSelected = (group == "All" && uiState.selectedGroup == null) ||
+                                group == uiState.selectedGroup
+
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { viewModel.selectGroup(group) },
+                            label = { Text(group) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        )
+                    }
                 }
             }
 
-            // Results or empty state
-            if (uiState.query.isEmpty()) {
-                SearchPrompt()
-            } else if (uiState.results.isEmpty() && !uiState.isSearching) {
-                NoResults(query = uiState.query)
+            // Channel list or empty state
+            if (uiState.filteredChannels.isEmpty() && !uiState.isLoading) {
+                EmptyState(
+                    hasSources = uiState.sources.isNotEmpty(),
+                    showFavoritesOnly = uiState.showFavoritesOnly,
+                    hasSearchQuery = uiState.searchQuery.isNotBlank()
+                )
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(
-                        items = uiState.results,
+                        items = uiState.filteredChannels,
                         key = { it.id }
                     ) { channel ->
-                        SearchResultCard(
+                        ChannelCard(
                             channel = channel,
                             onClick = { onChannelClick(channel) },
                             onFavoriteClick = { viewModel.toggleFavorite(channel.id) }
@@ -153,7 +195,7 @@ fun SearchScreen(
 }
 
 @Composable
-private fun SearchResultCard(
+private fun ChannelCard(
     channel: Channel,
     onClick: () -> Unit,
     onFavoriteClick: () -> Unit
@@ -199,9 +241,7 @@ private fun SearchResultCard(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = channel.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -243,53 +283,41 @@ private fun SearchResultCard(
 }
 
 @Composable
-private fun SearchPrompt() {
+private fun EmptyState(
+    hasSources: Boolean,
+    showFavoritesOnly: Boolean,
+    hasSearchQuery: Boolean
+) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
-                imageVector = Icons.Default.Search,
+                imageVector = Icons.Default.Tv,
                 contentDescription = null,
                 modifier = Modifier.size(80.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Search for channels",
+                text = when {
+                    hasSearchQuery -> "No channels found"
+                    showFavoritesOnly -> "No favorite channels"
+                    hasSources -> "No channels yet"
+                    else -> "No sources added"
+                },
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Enter a channel name to search",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun NoResults(query: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "No results found",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "No channels match \"$query\"",
+                text = when {
+                    hasSearchQuery -> "Try a different search term"
+                    showFavoritesOnly -> "Mark channels as favorites to see them here"
+                    hasSources -> "Tap refresh to load channels"
+                    else -> "Add an IPTV source in Settings"
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )

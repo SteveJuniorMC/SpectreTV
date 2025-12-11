@@ -1,4 +1,4 @@
-package com.spectretv.app.presentation.screens.home
+package com.spectretv.app.presentation.screens.live
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,23 +15,26 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class HomeUiState(
+data class LiveUiState(
     val channels: List<Channel> = emptyList(),
+    val filteredChannels: List<Channel> = emptyList(),
     val groups: List<String> = emptyList(),
     val selectedGroup: String? = null,
+    val searchQuery: String = "",
+    val showFavoritesOnly: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
     val sources: List<Source> = emptyList()
 )
 
 @HiltViewModel
-class HomeViewModel @Inject constructor(
+class LiveViewModel @Inject constructor(
     private val channelRepository: ChannelRepository,
     private val sourceRepository: SourceRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(HomeUiState())
-    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(LiveUiState())
+    val uiState: StateFlow<LiveUiState> = _uiState.asStateFlow()
 
     init {
         loadData()
@@ -46,35 +49,57 @@ class HomeViewModel @Inject constructor(
             ) { channels, groups, sources ->
                 Triple(channels, groups, sources)
             }.collect { (channels, groups, sources) ->
-                val selectedGroup = _uiState.value.selectedGroup
-                val filteredChannels = if (selectedGroup != null) {
-                    channels.filter { it.group == selectedGroup }
-                } else {
-                    channels
-                }
-
                 _uiState.value = _uiState.value.copy(
-                    channels = filteredChannels,
+                    channels = channels,
                     groups = listOf("All") + groups,
                     sources = sources,
                     isLoading = false
                 )
+                applyFilters()
             }
         }
+    }
+
+    private fun applyFilters() {
+        val state = _uiState.value
+        var filtered = state.channels
+
+        // Apply group filter
+        if (state.selectedGroup != null) {
+            filtered = filtered.filter { it.group == state.selectedGroup }
+        }
+
+        // Apply favorites filter
+        if (state.showFavoritesOnly) {
+            filtered = filtered.filter { it.isFavorite }
+        }
+
+        // Apply search filter
+        if (state.searchQuery.isNotBlank()) {
+            filtered = filtered.filter {
+                it.name.contains(state.searchQuery, ignoreCase = true)
+            }
+        }
+
+        _uiState.value = _uiState.value.copy(filteredChannels = filtered)
     }
 
     fun selectGroup(group: String?) {
         val actualGroup = if (group == "All") null else group
         _uiState.value = _uiState.value.copy(selectedGroup = actualGroup)
+        applyFilters()
+    }
 
-        viewModelScope.launch {
-            val channels = if (actualGroup != null) {
-                channelRepository.getChannelsByGroup(actualGroup).first()
-            } else {
-                channelRepository.getAllChannels().first()
-            }
-            _uiState.value = _uiState.value.copy(channels = channels)
-        }
+    fun setSearchQuery(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        applyFilters()
+    }
+
+    fun toggleFavoritesFilter() {
+        _uiState.value = _uiState.value.copy(
+            showFavoritesOnly = !_uiState.value.showFavoritesOnly
+        )
+        applyFilters()
     }
 
     fun refreshChannels() {

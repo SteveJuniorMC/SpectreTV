@@ -1,4 +1,4 @@
-package com.spectretv.app.presentation.screens.home
+package com.spectretv.app.presentation.screens.series
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -6,24 +6,25 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,6 +35,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -44,7 +46,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,16 +57,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.spectretv.app.domain.model.Channel
+import com.spectretv.app.domain.model.Series
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(
-    onChannelClick: (Channel) -> Unit,
-    viewModel: HomeViewModel = hiltViewModel()
+fun SeriesScreen(
+    onSeriesClick: (Series) -> Unit,
+    viewModel: SeriesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showSearch by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
@@ -75,14 +80,44 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "SpectreTV",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
+                    if (showSearch) {
+                        OutlinedTextField(
+                            value = uiState.searchQuery,
+                            onValueChange = { viewModel.setSearchQuery(it) },
+                            placeholder = { Text("Search series...") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = {
+                                if (uiState.searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                        Icon(Icons.Default.Close, "Clear")
+                                    }
+                                }
+                            }
+                        )
+                    } else {
+                        Text(
+                            text = "Series",
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                    }
                 },
                 actions = {
+                    IconButton(onClick = { showSearch = !showSearch }) {
+                        Icon(
+                            imageVector = if (showSearch) Icons.Default.Close else Icons.Default.Search,
+                            contentDescription = if (showSearch) "Close search" else "Search"
+                        )
+                    }
+                    IconButton(onClick = { viewModel.toggleFavoritesFilter() }) {
+                        Icon(
+                            imageVector = if (uiState.showFavoritesOnly) Icons.Filled.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "Toggle favorites",
+                            tint = if (uiState.showFavoritesOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     IconButton(
-                        onClick = { viewModel.refreshChannels() },
+                        onClick = { viewModel.refreshSeries() },
                         enabled = !uiState.isLoading
                     ) {
                         if (uiState.isLoading) {
@@ -91,10 +126,7 @@ fun HomeScreen(
                                 strokeWidth = 2.dp
                             )
                         } else {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Refresh"
-                            )
+                            Icon(Icons.Default.Refresh, "Refresh")
                         }
                     }
                 },
@@ -110,20 +142,19 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Category chips
-            if (uiState.groups.isNotEmpty()) {
+            if (uiState.genres.isNotEmpty()) {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(uiState.groups) { group ->
-                        val isSelected = (group == "All" && uiState.selectedGroup == null) ||
-                                group == uiState.selectedGroup
+                    items(uiState.genres) { genre ->
+                        val isSelected = (genre == "All" && uiState.selectedGenre == null) ||
+                                genre == uiState.selectedGenre
 
                         FilterChip(
                             selected = isSelected,
-                            onClick = { viewModel.selectGroup(group) },
-                            label = { Text(group) },
+                            onClick = { viewModel.selectGenre(genre) },
+                            label = { Text(genre) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimary
@@ -133,25 +164,26 @@ fun HomeScreen(
                 }
             }
 
-            // Channel list or empty state
-            if (uiState.channels.isEmpty() && !uiState.isLoading) {
+            if (uiState.filteredSeries.isEmpty() && !uiState.isLoading) {
                 EmptyState(
                     hasSources = uiState.sources.isNotEmpty(),
-                    onRefresh = { viewModel.refreshChannels() }
+                    showFavoritesOnly = uiState.showFavoritesOnly,
+                    hasSearchQuery = uiState.searchQuery.isNotBlank()
                 )
             } else {
-                LazyColumn(
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(
-                        items = uiState.channels,
+                        items = uiState.filteredSeries,
                         key = { it.id }
-                    ) { channel ->
-                        ChannelCard(
-                            channel = channel,
-                            onClick = { onChannelClick(channel) },
-                            onFavoriteClick = { viewModel.toggleFavorite(channel.id) }
+                    ) { series ->
+                        SeriesCard(
+                            series = series,
+                            onClick = { onSeriesClick(series) }
                         )
                     }
                 }
@@ -161,38 +193,32 @@ fun HomeScreen(
 }
 
 @Composable
-private fun ChannelCard(
-    channel: Channel,
-    onClick: () -> Unit,
-    onFavoriteClick: () -> Unit
+private fun SeriesCard(
+    series: Series,
+    onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Channel logo
+        Column {
             Box(
                 modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
                     .background(MaterialTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center
             ) {
-                if (channel.logoUrl != null) {
+                if (series.posterUrl != null) {
                     AsyncImage(
-                        model = channel.logoUrl,
-                        contentDescription = channel.name,
+                        model = series.posterUrl,
+                        contentDescription = series.name,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
@@ -200,55 +226,41 @@ private fun ChannelCard(
                     Icon(
                         imageVector = Icons.Default.Tv,
                         contentDescription = null,
-                        modifier = Modifier.size(28.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
+                }
+
+                if (series.isFavorite) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Favorite,
+                            contentDescription = "Favorite",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Channel info
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Column(modifier = Modifier.padding(8.dp)) {
                 Text(
-                    text = channel.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
+                    text = series.name,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = channel.group,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Favorite button
-            IconButton(onClick = onFavoriteClick) {
-                Icon(
-                    imageVector = if (channel.isFavorite) Icons.Filled.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = if (channel.isFavorite) "Remove from favorites" else "Add to favorites",
-                    tint = if (channel.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Play button
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
-                    .clickable(onClick = onClick),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "Play",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
+                if (series.year != null) {
+                    Text(
+                        text = series.year,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -257,15 +269,14 @@ private fun ChannelCard(
 @Composable
 private fun EmptyState(
     hasSources: Boolean,
-    onRefresh: () -> Unit
+    showFavoritesOnly: Boolean,
+    hasSearchQuery: Boolean
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
                 imageVector = Icons.Default.Tv,
                 contentDescription = null,
@@ -274,13 +285,23 @@ private fun EmptyState(
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = if (hasSources) "No channels yet" else "No sources added",
+                text = when {
+                    hasSearchQuery -> "No series found"
+                    showFavoritesOnly -> "No favorite series"
+                    hasSources -> "No series yet"
+                    else -> "No sources added"
+                },
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = if (hasSources) "Tap refresh to load channels" else "Add an IPTV source in Settings",
+                text = when {
+                    hasSearchQuery -> "Try a different search term"
+                    showFavoritesOnly -> "Mark series as favorites to see them here"
+                    hasSources -> "Tap refresh to load series"
+                    else -> "Add an IPTV source in Settings"
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )

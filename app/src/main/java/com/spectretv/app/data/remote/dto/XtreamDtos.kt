@@ -118,14 +118,23 @@ data class XtreamVodStream(
     val releaseDateAlt: String?,
     @SerializedName("last_modified")
     val lastModified: String?,
+    // Use Any to handle both String and List<String> from different providers
     @SerializedName("backdrop_path")
-    val backdropPath: List<String>?
+    val backdropPathRaw: Any?
 ) {
     // Helper to get series_id as Int regardless of how provider returns it
     val seriesId: Int?
         get() = when (seriesIdRaw) {
             is Number -> seriesIdRaw.toInt()
             is String -> seriesIdRaw.toIntOrNull()
+            else -> null
+        }
+
+    // Helper to get backdrop_path as String regardless of format
+    val backdropPath: String?
+        get() = when (backdropPathRaw) {
+            is String -> backdropPathRaw.takeIf { it.isNotBlank() }
+            is List<*> -> (backdropPathRaw.firstOrNull() as? String)?.takeIf { it.isNotBlank() }
             else -> null
         }
 }
@@ -143,7 +152,7 @@ data class XtreamMovieInfo(
     @SerializedName("tmdb_id")
     val tmdbId: String?,
     @SerializedName("backdrop_path")
-    val backdropPath: List<String>?,
+    val backdropPathRaw: Any?,
     @SerializedName("youtube_trailer")
     val youtubeTrailer: String?,
     @SerializedName("genre")
@@ -162,7 +171,14 @@ data class XtreamMovieInfo(
     val durationSecs: Int?,
     @SerializedName("duration")
     val duration: String?
-)
+) {
+    val backdropPath: String?
+        get() = when (backdropPathRaw) {
+            is String -> backdropPathRaw.takeIf { it.isNotBlank() }
+            is List<*> -> (backdropPathRaw.firstOrNull() as? String)?.takeIf { it.isNotBlank() }
+            else -> null
+        }
+}
 
 data class XtreamMovieData(
     @SerializedName("stream_id")
@@ -209,14 +225,21 @@ data class XtreamSeriesDetails(
     @SerializedName("rating_5based")
     val rating5Based: Double?,
     @SerializedName("backdrop_path")
-    val backdropPath: List<String>?,
+    val backdropPathRaw: Any?,
     @SerializedName("youtube_trailer")
     val youtubeTrailer: String?,
     @SerializedName("episode_run_time")
     val episodeRunTime: String?,
     @SerializedName("category_id")
     val categoryId: String?
-)
+) {
+    val backdropPath: String?
+        get() = when (backdropPathRaw) {
+            is String -> backdropPathRaw.takeIf { it.isNotBlank() }
+            is List<*> -> (backdropPathRaw.firstOrNull() as? String)?.takeIf { it.isNotBlank() }
+            else -> null
+        }
+}
 
 data class XtreamSeason(
     @SerializedName("season_number")

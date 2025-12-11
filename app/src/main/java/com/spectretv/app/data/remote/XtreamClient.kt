@@ -110,7 +110,7 @@ class XtreamClient @Inject constructor(
                         name = stream.name ?: "Unknown",
                         streamUrl = buildVodStreamUrl(source, streamId, extension),
                         posterUrl = stream.streamIcon?.takeIf { it.isNotBlank() },
-                        backdropUrl = stream.backdropPath?.firstOrNull(),
+                        backdropUrl = stream.backdropPath,
                         plot = stream.plot,
                         genre = categoryMap[stream.categoryId] ?: "Uncategorized",
                         year = stream.releaseDate?.take(4),
@@ -182,7 +182,7 @@ class XtreamClient @Inject constructor(
                         name = series.name ?: "Unknown",
                         posterUrl = series.cover?.takeIf { it.isNotBlank() }
                             ?: series.streamIcon?.takeIf { it.isNotBlank() },
-                        backdropUrl = series.backdropPath?.firstOrNull(),
+                        backdropUrl = series.backdropPath,
                         plot = series.plot,
                         genre = categoryMap[series.categoryId] ?: "Uncategorized",
                         year = releaseYear,

@@ -1,6 +1,5 @@
 package com.spectretv.app.presentation.screens.player
 
-import android.app.Activity
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
@@ -66,8 +65,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
 import com.spectretv.app.data.local.preferences.VideoQuality
-import com.spectretv.app.presentation.LocalPipHandler
-import com.spectretv.app.presentation.MainActivity
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -77,14 +74,13 @@ import java.util.Locale
 fun PlayerScreen(
     streamUrl: String,
     title: String,
+    isInPipMode: Boolean,
     onBackClick: () -> Unit,
     viewModel: PlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val videoQuality by viewModel.videoQuality.collectAsState(initial = VideoQuality.AUTO)
     val context = LocalContext.current
-    val pipHandler = LocalPipHandler.current
-    val isInPipMode = pipHandler.isInPipMode
 
     var showControls by remember { mutableStateOf(true) }
     var isBuffering by remember { mutableStateOf(true) }
@@ -93,15 +89,6 @@ fun PlayerScreen(
     // Initialize ViewModel
     LaunchedEffect(streamUrl, title) {
         viewModel.initialize(streamUrl, title)
-    }
-
-    // Enable PiP auto-enter when leaving player, disable when leaving screen
-    DisposableEffect(Unit) {
-        val activity = context as? MainActivity
-        activity?.setShouldEnterPipOnLeave(true)
-        onDispose {
-            activity?.setShouldEnterPipOnLeave(false)
-        }
     }
 
     val trackSelector = remember {
@@ -131,10 +118,9 @@ fun PlayerScreen(
             }
     }
 
-    // Handle back button: enter PiP when not in PiP mode
-    // When in PiP, don't intercept - let system handle it (exits PiP and returns to app)
+    // Handle back button - call onBackClick which will enter PiP
     BackHandler(enabled = !isInPipMode) {
-        pipHandler.enterPipMode()
+        onBackClick()
     }
 
     // Auto-hide controls
@@ -328,10 +314,7 @@ fun PlayerScreen(
                 isPlaying = uiState.isPlaying,
                 hasAudioTracks = uiState.audioTracks.size > 1,
                 hasSubtitleTracks = uiState.subtitleTracks.isNotEmpty(),
-                onBackClick = {
-                    // Enter PiP instead of back
-                    pipHandler.enterPipMode()
-                },
+                onBackClick = onBackClick,
                 onPlayPauseClick = { viewModel.togglePlayPause() },
                 onTrackSettingsClick = { viewModel.toggleTrackSelector() }
             )

@@ -164,11 +164,25 @@ fun SeriesScreen(
                 }
             }
 
+            // Show debug info if available
+            uiState.debugInfo?.let { debug ->
+                Text(
+                    text = debug,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
             if (uiState.filteredSeries.isEmpty() && !uiState.isLoading) {
                 EmptyState(
                     hasSources = uiState.sources.isNotEmpty(),
                     showFavoritesOnly = uiState.showFavoritesOnly,
-                    hasSearchQuery = uiState.searchQuery.isNotBlank()
+                    hasSearchQuery = uiState.searchQuery.isNotBlank(),
+                    debugInfo = uiState.debugInfo
                 )
             } else {
                 LazyVerticalGrid(
@@ -270,13 +284,17 @@ private fun SeriesCard(
 private fun EmptyState(
     hasSources: Boolean,
     showFavoritesOnly: Boolean,
-    hasSearchQuery: Boolean
+    hasSearchQuery: Boolean,
+    debugInfo: String? = null
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(16.dp)
+        ) {
             Icon(
                 imageVector = Icons.Default.Tv,
                 contentDescription = null,
@@ -305,6 +323,22 @@ private fun EmptyState(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
+
+            // Show debug info
+            debugInfo?.let { info ->
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Debug Info:",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = info,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                )
+            }
         }
     }
 }

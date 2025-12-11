@@ -158,37 +158,50 @@ class VodRepositoryImpl @Inject constructor(
     }
 
     override suspend fun refreshSeries(source: Source) {
-        Log.d(TAG, "refreshSeries: source=${source.name}, type=${source.type}")
+        refreshSeriesWithDebug(source)
+    }
+
+    override suspend fun refreshSeriesWithDebug(source: Source): String {
+        val debugLines = mutableListOf<String>()
+        debugLines.add("Source: ${source.name} (${source.type})")
+
         if (source.type != SourceType.XTREAM) {
-            Log.d(TAG, "refreshSeries: Skipping non-Xtream source")
-            return
+            debugLines.add("Skipping: Not an Xtream source")
+            return debugLines.joinToString("\n")
         }
 
-        withContext(Dispatchers.IO) {
-            Log.d(TAG, "refreshSeries: Fetching series from XtreamClient...")
-            val seriesList = xtreamClient.getSeries(source)
-            Log.d(TAG, "refreshSeries: Got ${seriesList.size} series")
+        return withContext(Dispatchers.IO) {
+            try {
+                debugLines.add("Fetching series from API...")
+                val seriesList = xtreamClient.getSeriesWithDebug(source)
+                debugLines.add("API returned: ${seriesList.series.size} series")
+                debugLines.add(seriesList.debugInfo)
 
-            // Preserve favorites
-            val existingSeries = seriesDao.getSeriesBySource(source.id).first()
-            val existingFavorites = existingSeries
-                .filter { it.isFavorite }
-                .map { it.id }
-                .toSet()
+                // Preserve favorites
+                val existingSeries = seriesDao.getSeriesBySource(source.id).first()
+                val existingFavorites = existingSeries
+                    .filter { it.isFavorite }
+                    .map { it.id }
+                    .toSet()
 
-            // Delete old series and episodes from this source
-            episodeDao.deleteEpisodesBySource(source.id)
-            seriesDao.deleteSeriesBySource(source.id)
+                // Delete old series and episodes from this source
+                episodeDao.deleteEpisodesBySource(source.id)
+                seriesDao.deleteSeriesBySource(source.id)
 
-            // Insert new series with preserved favorites
-            val entities = seriesList.map { series ->
-                SeriesEntity.fromDomain(
-                    series.copy(isFavorite = existingFavorites.contains(series.id))
-                )
+                // Insert new series with preserved favorites
+                val entities = seriesList.series.map { series ->
+                    SeriesEntity.fromDomain(
+                        series.copy(isFavorite = existingFavorites.contains(series.id))
+                    )
+                }
+                debugLines.add("Inserting ${entities.size} series to DB")
+                seriesDao.insertSeries(entities)
+                debugLines.add("Done!")
+            } catch (e: Exception) {
+                debugLines.add("ERROR: ${e.message}")
+                debugLines.add(e.stackTraceToString().lines().take(5).joinToString("\n"))
             }
-            Log.d(TAG, "refreshSeries: Inserting ${entities.size} series entities")
-            seriesDao.insertSeries(entities)
-            Log.d(TAG, "refreshSeries: Done")
+            debugLines.joinToString("\n")
         }
     }
 

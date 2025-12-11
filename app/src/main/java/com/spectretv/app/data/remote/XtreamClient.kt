@@ -13,6 +13,11 @@ import javax.inject.Singleton
 
 private const val TAG = "XtreamClient"
 
+data class SeriesResult(
+    val series: List<Series>,
+    val debugInfo: String
+)
+
 @Singleton
 class XtreamClient @Inject constructor(
     private val xtreamApi: XtreamApi
@@ -135,36 +140,37 @@ class XtreamClient @Inject constructor(
     }
 
     suspend fun getSeries(source: Source): List<Series> {
-        val baseUrl = buildPlayerApiUrl(source.serverUrl!!)
-        Log.d(TAG, "getSeries: Fetching series categories...")
-        val categories = getSeriesCategories(source)
-        Log.d(TAG, "getSeries: Got ${categories.size} categories")
-        val categoryMap = categories.associate {
-            (it.categoryId ?: "") to (it.categoryName ?: "Uncategorized")
-        }
+        return getSeriesWithDebug(source).series
+    }
 
-        return try {
-            Log.d(TAG, "getSeries: Fetching series list...")
+    suspend fun getSeriesWithDebug(source: Source): SeriesResult {
+        val debugLines = mutableListOf<String>()
+        val baseUrl = buildPlayerApiUrl(source.serverUrl!!)
+
+        try {
+            val categories = getSeriesCategories(source)
+            debugLines.add("Categories: ${categories.size}")
+            val categoryMap = categories.associate {
+                (it.categoryId ?: "") to (it.categoryName ?: "Uncategorized")
+            }
+
             val seriesList = xtreamApi.getSeries(
                 baseUrl = baseUrl,
                 username = source.username!!,
                 password = source.password!!
             )
-            Log.d(TAG, "getSeries: Got ${seriesList.size} series from API")
+            debugLines.add("Raw API items: ${seriesList.size}")
 
-            // Debug first few items with all relevant fields
-            seriesList.take(5).forEachIndexed { index, s ->
-                Log.d(TAG, "getSeries: Item[$index] - name=${s.name}, " +
-                    "seriesIdRaw=${s.seriesIdRaw} (type=${s.seriesIdRaw?.javaClass?.name}), " +
-                    "seriesId=${s.seriesId}, " +
-                    "streamId=${s.streamId}, " +
-                    "categoryId=${s.categoryId}")
+            // Debug first few items
+            if (seriesList.isNotEmpty()) {
+                val sample = seriesList.first()
+                debugLines.add("Sample: name=${sample.name}, seriesIdRaw=${sample.seriesIdRaw} (${sample.seriesIdRaw?.javaClass?.simpleName}), streamId=${sample.streamId}")
             }
 
-            // Count items with valid series_id
-            val validCount = seriesList.count { it.seriesId != null }
-            val streamIdCount = seriesList.count { it.streamId != null }
-            Log.d(TAG, "getSeries: Items with valid seriesId: $validCount, with streamId: $streamIdCount")
+            // Count items with valid IDs
+            val validSeriesIdCount = seriesList.count { it.seriesId != null }
+            val validStreamIdCount = seriesList.count { it.streamId != null }
+            debugLines.add("With seriesId: $validSeriesIdCount, with streamId: $validStreamIdCount")
 
             val result = seriesList.mapNotNull { series ->
                 // Try seriesId first, fall back to streamId for compatibility
@@ -185,11 +191,12 @@ class XtreamClient @Inject constructor(
                     )
                 }
             }
-            Log.d(TAG, "getSeries: Mapped to ${result.size} Series objects")
-            result
+            debugLines.add("Mapped series: ${result.size}")
+
+            return SeriesResult(result, debugLines.joinToString("\n"))
         } catch (e: Exception) {
-            Log.e(TAG, "getSeries: Error fetching series", e)
-            emptyList()
+            debugLines.add("ERROR: ${e.message}")
+            return SeriesResult(emptyList(), debugLines.joinToString("\n"))
         }
     }
 

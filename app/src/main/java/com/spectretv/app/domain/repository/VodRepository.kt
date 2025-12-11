@@ -26,6 +26,7 @@ interface VodRepository {
     suspend fun getSeriesById(id: String): Series?
     suspend fun getEpisodes(seriesId: String): List<Episode>
     suspend fun refreshSeries(source: Source)
+    suspend fun refreshSeriesWithDebug(source: Source): String  // Returns debug info
     suspend fun toggleSeriesFavorite(seriesId: String)
 
     // Cleanup

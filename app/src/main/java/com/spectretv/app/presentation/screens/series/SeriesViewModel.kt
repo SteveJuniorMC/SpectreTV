@@ -24,7 +24,8 @@ data class SeriesUiState(
     val showFavoritesOnly: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val sources: List<Source> = emptyList()
+    val sources: List<Source> = emptyList(),
+    val debugInfo: String? = null
 )
 
 @HiltViewModel
@@ -101,17 +102,31 @@ class SeriesViewModel @Inject constructor(
 
     fun refreshSeries() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null, debugInfo = null)
             try {
                 val sources = sourceRepository.getActiveSources().first()
+                val debugLines = mutableListOf<String>()
+                debugLines.add("Active sources: ${sources.size}")
+
                 sources.forEach { source ->
-                    vodRepository.refreshSeries(source)
+                    debugLines.add("--- ${source.name} ---")
+                    val debug = vodRepository.refreshSeriesWithDebug(source)
+                    debugLines.add(debug)
                 }
-                _uiState.value = _uiState.value.copy(isLoading = false)
+
+                // Get the updated series count
+                val seriesCount = vodRepository.getAllSeries().first().size
+                debugLines.add("--- Total in DB: $seriesCount ---")
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    debugInfo = debugLines.joinToString("\n")
+                )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = e.message ?: "Failed to refresh series"
+                    error = e.message ?: "Failed to refresh series",
+                    debugInfo = "Error: ${e.message}"
                 )
             }
         }

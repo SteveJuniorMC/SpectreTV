@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -23,14 +24,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.spectretv.app.presentation.PlayerActivity
 import com.spectretv.app.presentation.screens.live.LiveScreen
 import com.spectretv.app.presentation.screens.movies.MovieDetailScreen
 import com.spectretv.app.presentation.screens.movies.MoviesScreen
-import com.spectretv.app.presentation.screens.player.PlayerScreen
 import com.spectretv.app.presentation.screens.series.SeriesDetailScreen
 import com.spectretv.app.presentation.screens.series.SeriesScreen
 import com.spectretv.app.presentation.screens.settings.SettingsScreen
-import java.net.URLDecoder
 
 data class BottomNavItem(
     val screen: Screen,
@@ -50,10 +50,17 @@ fun AppNavigation() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val context = LocalContext.current
 
-    // Hide bottom bar on player and detail screens
+    // Helper to launch player activity
+    fun launchPlayer(streamUrl: String, title: String) {
+        context.startActivity(
+            PlayerActivity.createIntent(context, streamUrl, title)
+        )
+    }
+
+    // Hide bottom bar on detail screens
     val showBottomBar = currentDestination?.route?.let { route ->
-        !route.startsWith("player") &&
         !route.startsWith("movie/") &&
         !route.startsWith("series/")
     } != false
@@ -97,9 +104,7 @@ fun AppNavigation() {
             composable(Screen.Live.route) {
                 LiveScreen(
                     onChannelClick = { channel ->
-                        navController.navigate(
-                            Screen.Player.createRoute(channel.streamUrl, channel.name)
-                        )
+                        launchPlayer(channel.streamUrl, channel.name)
                     }
                 )
             }
@@ -121,9 +126,7 @@ fun AppNavigation() {
                 MovieDetailScreen(
                     onBackClick = { navController.popBackStack() },
                     onPlayClick = { movie ->
-                        navController.navigate(
-                            Screen.Player.createRoute(movie.streamUrl, movie.name)
-                        )
+                        launchPlayer(movie.streamUrl, movie.name)
                     }
                 )
             }
@@ -145,29 +148,8 @@ fun AppNavigation() {
                 SeriesDetailScreen(
                     onBackClick = { navController.popBackStack() },
                     onEpisodeClick = { episode ->
-                        navController.navigate(
-                            Screen.Player.createRoute(episode.streamUrl, episode.name)
-                        )
+                        launchPlayer(episode.streamUrl, episode.name)
                     }
-                )
-            }
-
-            composable(
-                route = Screen.Player.route,
-                arguments = listOf(
-                    navArgument("streamUrl") { type = NavType.StringType },
-                    navArgument("title") { type = NavType.StringType }
-                )
-            ) { backStackEntry ->
-                val encodedUrl = backStackEntry.arguments?.getString("streamUrl") ?: ""
-                val encodedTitle = backStackEntry.arguments?.getString("title") ?: ""
-                val streamUrl = URLDecoder.decode(encodedUrl, "UTF-8")
-                val title = URLDecoder.decode(encodedTitle, "UTF-8")
-
-                PlayerScreen(
-                    streamUrl = streamUrl,
-                    title = title,
-                    onBackClick = { navController.popBackStack() }
                 )
             }
 

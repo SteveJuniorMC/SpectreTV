@@ -10,6 +10,7 @@ import com.spectretv.app.domain.model.SourceType
 import com.spectretv.app.domain.repository.ChannelRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -71,12 +72,11 @@ class ChannelRepositoryImpl @Inject constructor(
             }
 
             // Preserve favorites
-            val existingFavorites = mutableSetOf<String>()
-            channelDao.getChannelsBySource(source.id).collect { existing ->
-                existing.filter { it.isFavorite }.forEach {
-                    existingFavorites.add(it.id)
-                }
-            }
+            val existingChannels = channelDao.getChannelsBySource(source.id).first()
+            val existingFavorites = existingChannels
+                .filter { it.isFavorite }
+                .map { it.id }
+                .toSet()
 
             // Delete old channels from this source
             channelDao.deleteChannelsBySource(source.id)

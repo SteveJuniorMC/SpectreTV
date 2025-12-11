@@ -1,6 +1,7 @@
 package com.spectretv.app.presentation.navigation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -17,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -26,7 +26,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.spectretv.app.presentation.PlayerActivity
+import com.spectretv.app.presentation.player.FullScreenPlayer
+import com.spectretv.app.presentation.player.MiniPlayer
+import com.spectretv.app.presentation.player.PlayerManager
 import com.spectretv.app.presentation.screens.live.LiveScreen
 import com.spectretv.app.presentation.screens.movies.MovieDetailScreen
 import com.spectretv.app.presentation.screens.movies.MoviesScreen
@@ -48,18 +50,14 @@ val bottomNavItems = listOf(
 )
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(playerManager: PlayerManager) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    val context = LocalContext.current
 
-    // Helper to launch player activity
-    fun launchPlayer(streamUrl: String, title: String) {
-        context.startActivity(
-            PlayerActivity.createIntent(context, streamUrl, title)
-        )
-    }
+    val currentStream = playerManager.currentStream
+    val isFullScreen = playerManager.isFullScreen
+    val isPlaying = playerManager.isPlaying
 
     // Hide bottom bar on detail screens
     val showBottomBar = currentDestination?.route?.let { route ->
@@ -67,99 +65,124 @@ fun AppNavigation() {
         !route.startsWith("series/")
     } != false
 
-    // Use Scaffold only for bottom bar, let individual screens handle their own top bars
-    Scaffold(
-        bottomBar = {
-            if (showBottomBar) {
-                NavigationBar {
-                    bottomNavItems.forEach { item ->
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    imageVector = item.icon,
-                                    contentDescription = item.label
-                                )
-                            },
-                            label = { Text(item.label) },
-                            selected = currentDestination?.hierarchy?.any {
-                                it.route == item.screen.route
-                            } == true,
-                            onClick = {
-                                navController.navigate(item.screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Main content with navigation
+        Scaffold(
+            bottomBar = {
+                if (showBottomBar && !isFullScreen) {
+                    Column {
+                        // Mini player above bottom nav
+                        if (currentStream != null && !isFullScreen) {
+                            MiniPlayer(
+                                title = currentStream.title,
+                                exoPlayer = playerManager.exoPlayer,
+                                isPlaying = isPlaying,
+                                onExpand = { playerManager.expand() },
+                                onPlayPause = { playerManager.togglePlayPause() },
+                                onClose = { playerManager.stop() }
+                            )
+                        }
+                        NavigationBar {
+                            bottomNavItems.forEach { item ->
+                                NavigationBarItem(
+                                    icon = {
+                                        Icon(
+                                            imageVector = item.icon,
+                                            contentDescription = item.label
+                                        )
+                                    },
+                                    label = { Text(item.label) },
+                                    selected = currentDestination?.hierarchy?.any {
+                                        it.route == item.screen.route
+                                    } == true,
+                                    onClick = {
+                                        navController.navigate(item.screen.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
+                                )
                             }
-                        )
+                        }
                     }
                 }
             }
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = Screen.Live.route,
+                modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
+            ) {
+                composable(Screen.Live.route) {
+                    LiveScreen(
+                        onChannelClick = { channel ->
+                            playerManager.play(channel.streamUrl, channel.name)
+                        }
+                    )
+                }
+
+                composable(Screen.Movies.route) {
+                    MoviesScreen(
+                        onMovieClick = { movie ->
+                            navController.navigate(Screen.MovieDetail.createRoute(movie.id))
+                        }
+                    )
+                }
+
+                composable(
+                    route = Screen.MovieDetail.route,
+                    arguments = listOf(
+                        navArgument("movieId") { type = NavType.StringType }
+                    )
+                ) {
+                    MovieDetailScreen(
+                        onBackClick = { navController.popBackStack() },
+                        onPlayClick = { movie ->
+                            playerManager.play(movie.streamUrl, movie.name)
+                        }
+                    )
+                }
+
+                composable(Screen.Series.route) {
+                    SeriesScreen(
+                        onSeriesClick = { series ->
+                            navController.navigate(Screen.SeriesDetail.createRoute(series.id))
+                        }
+                    )
+                }
+
+                composable(
+                    route = Screen.SeriesDetail.route,
+                    arguments = listOf(
+                        navArgument("seriesId") { type = NavType.StringType }
+                    )
+                ) {
+                    SeriesDetailScreen(
+                        onBackClick = { navController.popBackStack() },
+                        onEpisodeClick = { episode ->
+                            playerManager.play(episode.streamUrl, episode.name)
+                        }
+                    )
+                }
+
+                composable(Screen.Settings.route) {
+                    SettingsScreen()
+                }
+            }
         }
-    ) { innerPadding ->
-        // Only apply bottom padding, let screens handle top insets themselves
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Live.route,
-            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
-        ) {
-            composable(Screen.Live.route) {
-                LiveScreen(
-                    onChannelClick = { channel ->
-                        launchPlayer(channel.streamUrl, channel.name)
-                    }
-                )
-            }
 
-            composable(Screen.Movies.route) {
-                MoviesScreen(
-                    onMovieClick = { movie ->
-                        navController.navigate(Screen.MovieDetail.createRoute(movie.id))
-                    }
-                )
-            }
-
-            composable(
-                route = Screen.MovieDetail.route,
-                arguments = listOf(
-                    navArgument("movieId") { type = NavType.StringType }
-                )
-            ) {
-                MovieDetailScreen(
-                    onBackClick = { navController.popBackStack() },
-                    onPlayClick = { movie ->
-                        launchPlayer(movie.streamUrl, movie.name)
-                    }
-                )
-            }
-
-            composable(Screen.Series.route) {
-                SeriesScreen(
-                    onSeriesClick = { series ->
-                        navController.navigate(Screen.SeriesDetail.createRoute(series.id))
-                    }
-                )
-            }
-
-            composable(
-                route = Screen.SeriesDetail.route,
-                arguments = listOf(
-                    navArgument("seriesId") { type = NavType.StringType }
-                )
-            ) {
-                SeriesDetailScreen(
-                    onBackClick = { navController.popBackStack() },
-                    onEpisodeClick = { episode ->
-                        launchPlayer(episode.streamUrl, episode.name)
-                    }
-                )
-            }
-
-            composable(Screen.Settings.route) {
-                SettingsScreen()
-            }
+        // Full screen player overlay
+        if (currentStream != null && isFullScreen) {
+            FullScreenPlayer(
+                title = currentStream.title,
+                exoPlayer = playerManager.exoPlayer,
+                isPlaying = isPlaying,
+                onMinimize = { playerManager.minimize() },
+                onPlayPause = { playerManager.togglePlayPause() }
+            )
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.spectretv.app.presentation.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LiveTv
@@ -65,6 +67,7 @@ fun AppNavigation() {
         !route.startsWith("series/")
     } != false
 
+    // Use Scaffold only for bottom bar, let individual screens handle their own top bars
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
@@ -96,10 +99,11 @@ fun AppNavigation() {
             }
         }
     ) { innerPadding ->
+        // Only apply bottom padding, let screens handle top insets themselves
         NavHost(
             navController = navController,
             startDestination = Screen.Live.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
         ) {
             composable(Screen.Live.route) {
                 LiveScreen(

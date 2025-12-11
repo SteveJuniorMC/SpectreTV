@@ -1,5 +1,6 @@
 package com.spectretv.app.data.remote
 
+import android.util.Log
 import com.spectretv.app.data.remote.api.XtreamApi
 import com.spectretv.app.data.remote.dto.XtreamCategory
 import com.spectretv.app.domain.model.Channel
@@ -9,6 +10,8 @@ import com.spectretv.app.domain.model.Series
 import com.spectretv.app.domain.model.Source
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val TAG = "XtreamClient"
 
 @Singleton
 class XtreamClient @Inject constructor(
@@ -133,23 +136,43 @@ class XtreamClient @Inject constructor(
 
     suspend fun getSeries(source: Source): List<Series> {
         val baseUrl = buildPlayerApiUrl(source.serverUrl!!)
+        Log.d(TAG, "getSeries: Fetching series categories...")
         val categories = getSeriesCategories(source)
+        Log.d(TAG, "getSeries: Got ${categories.size} categories")
         val categoryMap = categories.associate {
             (it.categoryId ?: "") to (it.categoryName ?: "Uncategorized")
         }
 
         return try {
+            Log.d(TAG, "getSeries: Fetching series list...")
             val seriesList = xtreamApi.getSeries(
                 baseUrl = baseUrl,
                 username = source.username!!,
                 password = source.password!!
             )
+            Log.d(TAG, "getSeries: Got ${seriesList.size} series from API")
 
-            seriesList.mapNotNull { series ->
-                series.seriesId?.let { seriesId ->
+            // Debug first few items with all relevant fields
+            seriesList.take(5).forEachIndexed { index, s ->
+                Log.d(TAG, "getSeries: Item[$index] - name=${s.name}, " +
+                    "seriesIdRaw=${s.seriesIdRaw} (type=${s.seriesIdRaw?.javaClass?.name}), " +
+                    "seriesId=${s.seriesId}, " +
+                    "streamId=${s.streamId}, " +
+                    "categoryId=${s.categoryId}")
+            }
+
+            // Count items with valid series_id
+            val validCount = seriesList.count { it.seriesId != null }
+            val streamIdCount = seriesList.count { it.streamId != null }
+            Log.d(TAG, "getSeries: Items with valid seriesId: $validCount, with streamId: $streamIdCount")
+
+            val result = seriesList.mapNotNull { series ->
+                // Try seriesId first, fall back to streamId for compatibility
+                val id = series.seriesId ?: series.streamId
+                id?.let { seriesIdValue ->
                     val releaseYear = (series.releaseDate ?: series.releaseDateAlt)?.take(4)
                     Series(
-                        id = "${source.id}_series_$seriesId",
+                        id = "${source.id}_series_$seriesIdValue",
                         name = series.name ?: "Unknown",
                         posterUrl = series.cover?.takeIf { it.isNotBlank() }
                             ?: series.streamIcon?.takeIf { it.isNotBlank() },
@@ -162,7 +185,10 @@ class XtreamClient @Inject constructor(
                     )
                 }
             }
+            Log.d(TAG, "getSeries: Mapped to ${result.size} Series objects")
+            result
         } catch (e: Exception) {
+            Log.e(TAG, "getSeries: Error fetching series", e)
             emptyList()
         }
     }

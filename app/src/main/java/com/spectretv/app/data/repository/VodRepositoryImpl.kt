@@ -1,5 +1,6 @@
 package com.spectretv.app.data.repository
 
+import android.util.Log
 import com.spectretv.app.data.local.dao.EpisodeDao
 import com.spectretv.app.data.local.dao.MovieDao
 import com.spectretv.app.data.local.dao.SeriesDao
@@ -21,6 +22,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val TAG = "VodRepository"
 
 @Singleton
 class VodRepositoryImpl @Inject constructor(
@@ -155,10 +158,16 @@ class VodRepositoryImpl @Inject constructor(
     }
 
     override suspend fun refreshSeries(source: Source) {
-        if (source.type != SourceType.XTREAM) return
+        Log.d(TAG, "refreshSeries: source=${source.name}, type=${source.type}")
+        if (source.type != SourceType.XTREAM) {
+            Log.d(TAG, "refreshSeries: Skipping non-Xtream source")
+            return
+        }
 
         withContext(Dispatchers.IO) {
+            Log.d(TAG, "refreshSeries: Fetching series from XtreamClient...")
             val seriesList = xtreamClient.getSeries(source)
+            Log.d(TAG, "refreshSeries: Got ${seriesList.size} series")
 
             // Preserve favorites
             val existingSeries = seriesDao.getSeriesBySource(source.id).first()
@@ -177,7 +186,9 @@ class VodRepositoryImpl @Inject constructor(
                     series.copy(isFavorite = existingFavorites.contains(series.id))
                 )
             }
+            Log.d(TAG, "refreshSeries: Inserting ${entities.size} series entities")
             seriesDao.insertSeries(entities)
+            Log.d(TAG, "refreshSeries: Done")
         }
     }
 

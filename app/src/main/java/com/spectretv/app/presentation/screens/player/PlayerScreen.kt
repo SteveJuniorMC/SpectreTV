@@ -131,13 +131,10 @@ fun PlayerScreen(
             }
     }
 
-    // Handle back button: enter PiP first, then exit on second press
-    BackHandler {
-        if (isInPipMode) {
-            onBackClick()
-        } else {
-            pipHandler.enterPipMode()
-        }
+    // Handle back button: enter PiP when not in PiP mode
+    // When in PiP, don't intercept - let system handle it (exits PiP and returns to app)
+    BackHandler(enabled = !isInPipMode) {
+        pipHandler.enterPipMode()
     }
 
     // Auto-hide controls

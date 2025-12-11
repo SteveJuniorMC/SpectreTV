@@ -119,6 +119,7 @@ fun SeriesDetailScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SeriesDetailContent(
     uiState: SeriesDetailUiState,

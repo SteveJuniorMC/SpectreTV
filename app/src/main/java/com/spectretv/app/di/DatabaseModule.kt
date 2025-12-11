@@ -7,6 +7,7 @@ import com.spectretv.app.data.local.dao.EpisodeDao
 import com.spectretv.app.data.local.dao.MovieDao
 import com.spectretv.app.data.local.dao.SeriesDao
 import com.spectretv.app.data.local.dao.SourceDao
+import com.spectretv.app.data.local.dao.WatchHistoryDao
 import com.spectretv.app.data.local.db.AppDatabase
 import dagger.Module
 import dagger.Provides
@@ -61,5 +62,11 @@ object DatabaseModule {
     @Singleton
     fun provideEpisodeDao(database: AppDatabase): EpisodeDao {
         return database.episodeDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideWatchHistoryDao(database: AppDatabase): WatchHistoryDao {
+        return database.watchHistoryDao()
     }
 }

@@ -11,26 +11,36 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -39,7 +49,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,9 +73,30 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import java.util.Locale
+import java.util.concurrent.TimeUnit
+
+enum class AspectRatioMode(val label: String, val value: Int) {
+    FIT("Fit", AspectRatioFrameLayout.RESIZE_MODE_FIT),
+    FILL("Fill", AspectRatioFrameLayout.RESIZE_MODE_FILL),
+    ZOOM("Zoom", AspectRatioFrameLayout.RESIZE_MODE_ZOOM),
+    FIXED_WIDTH("Fixed Width", AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH),
+    FIXED_HEIGHT("Fixed Height", AspectRatioFrameLayout.RESIZE_MODE_FIXED_HEIGHT)
+}
+
+private fun formatDuration(ms: Long): String {
+    val hours = TimeUnit.MILLISECONDS.toHours(ms)
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
+    val seconds = TimeUnit.MILLISECONDS.toSeconds(ms) % 60
+    return if (hours > 0) {
+        String.format("%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%d:%02d", minutes, seconds)
+    }
+}
 
 data class TrackInfo(
     val index: Int,
@@ -149,8 +182,12 @@ fun FullScreenPlayer(
     title: String,
     exoPlayer: ExoPlayer?,
     isPlaying: Boolean,
+    contentType: ContentType = ContentType.LIVE,
     onMinimize: () -> Unit,
     onPlayPause: () -> Unit,
+    onSeekTo: (Long) -> Unit = {},
+    onSkipForward: () -> Unit = {},
+    onSkipBackward: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -165,6 +202,19 @@ fun FullScreenPlayer(
     val subtitleTracks = remember(title) { mutableStateListOf<TrackInfo>() }
     var selectedAudioIndex by remember(title) { mutableIntStateOf(0) }
     var selectedSubtitleIndex by remember(title) { mutableIntStateOf(-1) }
+
+    // Playback position state for VOD content
+    var currentPosition by remember { mutableLongStateOf(0L) }
+    var duration by remember { mutableLongStateOf(0L) }
+    var isSeeking by remember { mutableStateOf(false) }
+    var seekPosition by remember { mutableFloatStateOf(0f) }
+
+    // Aspect ratio state
+    var aspectRatioMode by remember { mutableStateOf(AspectRatioMode.FIT) }
+    var showAspectRatioMenu by remember { mutableStateOf(false) }
+    var playerView by remember { mutableStateOf<PlayerView?>(null) }
+
+    val isVod = contentType == ContentType.VOD
 
     // Handle back button - minimize instead of PiP
     BackHandler {
@@ -194,9 +244,24 @@ fun FullScreenPlayer(
 
     // Auto-hide controls
     LaunchedEffect(showControls) {
-        if (showControls && !showTrackSelector) {
+        if (showControls && !showTrackSelector && !showAspectRatioMenu) {
             delay(4000)
             showControls = false
+        }
+    }
+
+    // Update playback position for VOD content
+    LaunchedEffect(isVod, isPlaying) {
+        if (isVod && isPlaying && !isSeeking) {
+            while (true) {
+                exoPlayer?.let { player ->
+                    currentPosition = player.currentPosition
+                    if (player.duration > 0) {
+                        duration = player.duration
+                    }
+                }
+                delay(1000)
+            }
         }
     }
 
@@ -206,6 +271,14 @@ fun FullScreenPlayer(
         exoPlayer?.let { player ->
             val state = player.playbackState
             isBuffering = state == Player.STATE_BUFFERING || state == Player.STATE_IDLE
+
+            // Get initial position and duration for VOD
+            if (isVod) {
+                currentPosition = player.currentPosition
+                if (player.duration > 0) {
+                    duration = player.duration
+                }
+            }
 
             // Also check current tracks immediately
             updateTracks(player.currentTracks, audioTracks, subtitleTracks) { audioIdx, subIdx ->
@@ -293,11 +366,16 @@ fun FullScreenPlayer(
                     PlayerView(ctx).apply {
                         this.player = player
                         useController = false
+                        resizeMode = aspectRatioMode.value
                         layoutParams = FrameLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
+                        playerView = this
                     }
+                },
+                update = { view ->
+                    view.resizeMode = aspectRatioMode.value
                 },
                 modifier = Modifier.fillMaxSize()
             )
@@ -323,7 +401,7 @@ fun FullScreenPlayer(
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.4f))
             ) {
-                // Top bar with back, title, and settings
+                // Top bar with back, title, aspect ratio, and settings
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -345,6 +423,43 @@ fun FullScreenPlayer(
                         modifier = Modifier.weight(1f)
                     )
 
+                    // Aspect ratio button
+                    Box {
+                        IconButton(onClick = { showAspectRatioMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.AspectRatio,
+                                contentDescription = "Aspect ratio",
+                                tint = Color.White
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showAspectRatioMenu,
+                            onDismissRequest = { showAspectRatioMenu = false }
+                        ) {
+                            AspectRatioMode.entries.forEach { mode ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(mode.label)
+                                            if (mode == aspectRatioMode) {
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = "Selected",
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    onClick = {
+                                        aspectRatioMode = mode
+                                        showAspectRatioMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
                     // Settings button for track selection
                     if (audioTracks.size > 1 || subtitleTracks.isNotEmpty()) {
                         IconButton(onClick = { showTrackSelector = true }) {
@@ -357,13 +472,30 @@ fun FullScreenPlayer(
                     }
                 }
 
-                // Center play/pause (hide when buffering)
+                // Center controls (skip back, play/pause, skip forward) - hide when buffering
                 if (!isBuffering) {
-                    Column(
+                    Row(
                         modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Skip backward (VOD only)
+                        if (isVod) {
+                            IconButton(
+                                onClick = onSkipBackward,
+                                modifier = Modifier.size(56.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Replay10,
+                                    contentDescription = "Skip back 10 seconds",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(24.dp))
+                        }
+
+                        // Play/Pause button
                         Box(
                             modifier = Modifier
                                 .size(72.dp)
@@ -377,6 +509,67 @@ fun FullScreenPlayer(
                                 contentDescription = if (isPlaying) "Pause" else "Play",
                                 tint = Color.White,
                                 modifier = Modifier.size(48.dp)
+                            )
+                        }
+
+                        // Skip forward (VOD only)
+                        if (isVod) {
+                            Spacer(modifier = Modifier.width(24.dp))
+                            IconButton(
+                                onClick = onSkipForward,
+                                modifier = Modifier.size(56.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Forward10,
+                                    contentDescription = "Skip forward 10 seconds",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Bottom seek bar (VOD only)
+                if (isVod && duration > 0) {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 24.dp)
+                    ) {
+                        Slider(
+                            value = if (isSeeking) seekPosition else (currentPosition.toFloat() / duration.toFloat()),
+                            onValueChange = { value ->
+                                isSeeking = true
+                                seekPosition = value
+                            },
+                            onValueChangeFinished = {
+                                val newPosition = (seekPosition * duration).toLong()
+                                onSeekTo(newPosition)
+                                currentPosition = newPosition
+                                isSeeking = false
+                            },
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color.White,
+                                activeTrackColor = Color.White,
+                                inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = formatDuration(if (isSeeking) (seekPosition * duration).toLong() else currentPosition),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White
+                            )
+                            Text(
+                                text = formatDuration(duration),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White
                             )
                         }
                     }

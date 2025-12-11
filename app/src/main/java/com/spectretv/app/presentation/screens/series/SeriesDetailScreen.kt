@@ -58,7 +58,7 @@ import com.spectretv.app.domain.model.Episode
 @Composable
 fun SeriesDetailScreen(
     onBackClick: () -> Unit,
-    onEpisodeClick: (Episode) -> Unit,
+    onEpisodeClick: (Episode, String) -> Unit,
     viewModel: SeriesDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -102,7 +102,9 @@ fun SeriesDetailScreen(
                 SeriesDetailContent(
                     uiState = uiState,
                     onSeasonSelect = { viewModel.selectSeason(it) },
-                    onEpisodeClick = onEpisodeClick,
+                    onEpisodeClick = { episode ->
+                        onEpisodeClick(episode, uiState.series!!.name)
+                    },
                     filteredEpisodes = viewModel.getFilteredEpisodes(),
                     modifier = Modifier.padding(paddingValues)
                 )

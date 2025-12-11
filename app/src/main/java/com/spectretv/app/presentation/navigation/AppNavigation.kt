@@ -26,6 +26,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.spectretv.app.presentation.player.ContentType
 import com.spectretv.app.presentation.player.FullScreenPlayer
 import com.spectretv.app.presentation.player.MiniPlayer
 import com.spectretv.app.presentation.player.PlayerManager
@@ -119,7 +120,13 @@ fun AppNavigation(playerManager: PlayerManager) {
                 composable(Screen.Live.route) {
                     LiveScreen(
                         onChannelClick = { channel ->
-                            playerManager.play(channel.streamUrl, channel.name)
+                            playerManager.play(
+                                url = channel.streamUrl,
+                                title = channel.name,
+                                contentType = ContentType.LIVE,
+                                contentId = channel.id,
+                                posterUrl = channel.logoUrl
+                            )
                         }
                     )
                 }
@@ -141,7 +148,13 @@ fun AppNavigation(playerManager: PlayerManager) {
                     MovieDetailScreen(
                         onBackClick = { navController.popBackStack() },
                         onPlayClick = { movie ->
-                            playerManager.play(movie.streamUrl, movie.name)
+                            playerManager.play(
+                                url = movie.streamUrl,
+                                title = movie.name,
+                                contentType = ContentType.VOD,
+                                contentId = movie.id,
+                                posterUrl = movie.posterUrl
+                            )
                         }
                     )
                 }
@@ -162,8 +175,18 @@ fun AppNavigation(playerManager: PlayerManager) {
                 ) {
                     SeriesDetailScreen(
                         onBackClick = { navController.popBackStack() },
-                        onEpisodeClick = { episode ->
-                            playerManager.play(episode.streamUrl, episode.name)
+                        onEpisodeClick = { episode, seriesName ->
+                            playerManager.play(
+                                url = episode.streamUrl,
+                                title = episode.name,
+                                contentType = ContentType.VOD,
+                                contentId = episode.id,
+                                posterUrl = episode.posterUrl,
+                                seriesId = episode.seriesId,
+                                seriesName = seriesName,
+                                seasonNumber = episode.seasonNumber,
+                                episodeNumber = episode.episodeNumber
+                            )
                         }
                     )
                 }
@@ -180,8 +203,12 @@ fun AppNavigation(playerManager: PlayerManager) {
                 title = currentStream.title,
                 exoPlayer = playerManager.exoPlayer,
                 isPlaying = isPlaying,
+                contentType = currentStream.contentType,
                 onMinimize = { playerManager.minimize() },
-                onPlayPause = { playerManager.togglePlayPause() }
+                onPlayPause = { playerManager.togglePlayPause() },
+                onSeekTo = { playerManager.seekTo(it) },
+                onSkipForward = { playerManager.skipForward() },
+                onSkipBackward = { playerManager.skipBackward() }
             )
         }
     }

@@ -15,6 +15,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class SeriesSortOption(val label: String) {
+    NAME_ASC("Name (A-Z)"),
+    NAME_DESC("Name (Z-A)"),
+    YEAR_DESC("Year (Newest)"),
+    YEAR_ASC("Year (Oldest)"),
+    RATING_DESC("Rating (Highest)"),
+    RATING_ASC("Rating (Lowest)")
+}
+
 data class SeriesUiState(
     val series: List<Series> = emptyList(),
     val filteredSeries: List<Series> = emptyList(),
@@ -22,6 +31,7 @@ data class SeriesUiState(
     val selectedGenre: String? = null,
     val searchQuery: String = "",
     val showFavoritesOnly: Boolean = false,
+    val sortOption: SeriesSortOption = SeriesSortOption.NAME_ASC,
     val isLoading: Boolean = false,
     val error: String? = null,
     val sources: List<Source> = emptyList(),
@@ -79,6 +89,16 @@ class SeriesViewModel @Inject constructor(
             }
         }
 
+        // Apply sorting
+        filtered = when (state.sortOption) {
+            SeriesSortOption.NAME_ASC -> filtered.sortedBy { it.name.lowercase() }
+            SeriesSortOption.NAME_DESC -> filtered.sortedByDescending { it.name.lowercase() }
+            SeriesSortOption.YEAR_DESC -> filtered.sortedByDescending { it.year ?: "0" }
+            SeriesSortOption.YEAR_ASC -> filtered.sortedBy { it.year ?: "9999" }
+            SeriesSortOption.RATING_DESC -> filtered.sortedByDescending { it.rating?.toDoubleOrNull() ?: 0.0 }
+            SeriesSortOption.RATING_ASC -> filtered.sortedBy { it.rating?.toDoubleOrNull() ?: 0.0 }
+        }
+
         _uiState.value = _uiState.value.copy(filteredSeries = filtered)
     }
 
@@ -97,6 +117,11 @@ class SeriesViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             showFavoritesOnly = !_uiState.value.showFavoritesOnly
         )
+        applyFilters()
+    }
+
+    fun setSortOption(option: SeriesSortOption) {
+        _uiState.value = _uiState.value.copy(sortOption = option)
         applyFilters()
     }
 

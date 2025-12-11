@@ -8,19 +8,38 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import com.spectretv.app.data.local.entity.WatchHistoryEntity
+import com.spectretv.app.domain.repository.WatchHistoryRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
+enum class ContentType {
+    LIVE,
+    VOD
+}
+
 data class PlayingStream(
     val url: String,
-    val title: String
+    val title: String,
+    val contentType: ContentType = ContentType.LIVE,
+    val contentId: String? = null,  // For tracking watch history
+    val posterUrl: String? = null,
+    val seriesId: String? = null,
+    val seriesName: String? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null
 )
 
 @Singleton
 class PlayerManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val watchHistoryRepository: WatchHistoryRepository
 ) {
     var currentStream by mutableStateOf<PlayingStream?>(null)
         private set
@@ -37,13 +56,70 @@ class PlayerManager @Inject constructor(
 
     private var trackSelector: DefaultTrackSelector? = null
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(playing: Boolean) {
             isPlaying = playing
+            // Save progress when pausing
+            if (!playing) {
+                saveCurrentProgress()
+            }
         }
     }
 
-    fun play(url: String, title: String) {
+    private fun saveCurrentProgress() {
+        val stream = currentStream ?: return
+        val contentId = stream.contentId ?: return
+        val player = _exoPlayer ?: return
+
+        scope.launch {
+            val position = player.currentPosition
+            val duration = player.duration.takeIf { it > 0 } ?: 0L
+            watchHistoryRepository.updateProgress(contentId, position, duration)
+        }
+    }
+
+    private fun addToWatchHistory(stream: PlayingStream) {
+        val contentId = stream.contentId ?: return
+
+        scope.launch {
+            val contentTypeStr = when (stream.contentType) {
+                ContentType.LIVE -> "channel"
+                ContentType.VOD -> if (stream.seriesId != null) "episode" else "movie"
+            }
+
+            val entry = WatchHistoryEntity(
+                contentId = contentId,
+                contentType = contentTypeStr,
+                name = stream.title,
+                posterUrl = stream.posterUrl,
+                streamUrl = stream.url,
+                seriesId = stream.seriesId,
+                seriesName = stream.seriesName,
+                seasonNumber = stream.seasonNumber,
+                episodeNumber = stream.episodeNumber
+            )
+            watchHistoryRepository.addToHistory(entry)
+        }
+    }
+
+    fun play(
+        url: String,
+        title: String,
+        contentType: ContentType = ContentType.LIVE,
+        contentId: String? = null,
+        posterUrl: String? = null,
+        seriesId: String? = null,
+        seriesName: String? = null,
+        seasonNumber: Int? = null,
+        episodeNumber: Int? = null
+    ) {
+        // Save progress of current stream before switching
+        if (currentStream?.url != url) {
+            saveCurrentProgress()
+        }
+
         // If same stream, just ensure it's playing
         if (currentStream?.url == url) {
             _exoPlayer?.play()
@@ -52,8 +128,22 @@ class PlayerManager @Inject constructor(
         }
 
         // New stream - create or reuse player
-        currentStream = PlayingStream(url, title)
+        val stream = PlayingStream(
+            url = url,
+            title = title,
+            contentType = contentType,
+            contentId = contentId,
+            posterUrl = posterUrl,
+            seriesId = seriesId,
+            seriesName = seriesName,
+            seasonNumber = seasonNumber,
+            episodeNumber = episodeNumber
+        )
+        currentStream = stream
         isFullScreen = true
+
+        // Add to watch history
+        addToWatchHistory(stream)
 
         if (_exoPlayer == null) {
             trackSelector = DefaultTrackSelector(context).apply {
@@ -85,6 +175,24 @@ class PlayerManager @Inject constructor(
         }
     }
 
+    fun seekTo(positionMs: Long) {
+        _exoPlayer?.seekTo(positionMs)
+    }
+
+    fun skipForward(ms: Long = 10000) {
+        _exoPlayer?.let {
+            val newPosition = (it.currentPosition + ms).coerceAtMost(it.duration)
+            it.seekTo(newPosition)
+        }
+    }
+
+    fun skipBackward(ms: Long = 10000) {
+        _exoPlayer?.let {
+            val newPosition = (it.currentPosition - ms).coerceAtLeast(0)
+            it.seekTo(newPosition)
+        }
+    }
+
     fun minimize() {
         isFullScreen = false
     }
@@ -94,12 +202,14 @@ class PlayerManager @Inject constructor(
     }
 
     fun stop() {
+        saveCurrentProgress()
         _exoPlayer?.stop()
         currentStream = null
         isFullScreen = false
     }
 
     fun release() {
+        saveCurrentProgress()
         _exoPlayer?.apply {
             removeListener(playerListener)
             release()

@@ -7,11 +7,13 @@ import com.spectretv.app.data.local.dao.EpisodeDao
 import com.spectretv.app.data.local.dao.MovieDao
 import com.spectretv.app.data.local.dao.SeriesDao
 import com.spectretv.app.data.local.dao.SourceDao
+import com.spectretv.app.data.local.dao.WatchHistoryDao
 import com.spectretv.app.data.local.entity.ChannelEntity
 import com.spectretv.app.data.local.entity.EpisodeEntity
 import com.spectretv.app.data.local.entity.MovieEntity
 import com.spectretv.app.data.local.entity.SeriesEntity
 import com.spectretv.app.data.local.entity.SourceEntity
+import com.spectretv.app.data.local.entity.WatchHistoryEntity
 
 @Database(
     entities = [
@@ -19,9 +21,10 @@ import com.spectretv.app.data.local.entity.SourceEntity
         ChannelEntity::class,
         MovieEntity::class,
         SeriesEntity::class,
-        EpisodeEntity::class
+        EpisodeEntity::class,
+        WatchHistoryEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,6 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun movieDao(): MovieDao
     abstract fun seriesDao(): SeriesDao
     abstract fun episodeDao(): EpisodeDao
+    abstract fun watchHistoryDao(): WatchHistoryDao
 
     companion object {
         const val DATABASE_NAME = "spectretv_database"

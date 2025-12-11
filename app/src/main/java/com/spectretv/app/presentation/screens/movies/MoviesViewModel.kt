@@ -15,6 +15,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class SortOption(val label: String) {
+    NAME_ASC("Name (A-Z)"),
+    NAME_DESC("Name (Z-A)"),
+    YEAR_DESC("Year (Newest)"),
+    YEAR_ASC("Year (Oldest)"),
+    RATING_DESC("Rating (Highest)"),
+    RATING_ASC("Rating (Lowest)")
+}
+
 data class MoviesUiState(
     val movies: List<Movie> = emptyList(),
     val filteredMovies: List<Movie> = emptyList(),
@@ -22,6 +31,7 @@ data class MoviesUiState(
     val selectedGenre: String? = null,
     val searchQuery: String = "",
     val showFavoritesOnly: Boolean = false,
+    val sortOption: SortOption = SortOption.NAME_ASC,
     val isLoading: Boolean = false,
     val error: String? = null,
     val sources: List<Source> = emptyList()
@@ -78,6 +88,16 @@ class MoviesViewModel @Inject constructor(
             }
         }
 
+        // Apply sorting
+        filtered = when (state.sortOption) {
+            SortOption.NAME_ASC -> filtered.sortedBy { it.name.lowercase() }
+            SortOption.NAME_DESC -> filtered.sortedByDescending { it.name.lowercase() }
+            SortOption.YEAR_DESC -> filtered.sortedByDescending { it.year ?: "0" }
+            SortOption.YEAR_ASC -> filtered.sortedBy { it.year ?: "9999" }
+            SortOption.RATING_DESC -> filtered.sortedByDescending { it.rating?.toDoubleOrNull() ?: 0.0 }
+            SortOption.RATING_ASC -> filtered.sortedBy { it.rating?.toDoubleOrNull() ?: 0.0 }
+        }
+
         _uiState.value = _uiState.value.copy(filteredMovies = filtered)
     }
 
@@ -96,6 +116,11 @@ class MoviesViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             showFavoritesOnly = !_uiState.value.showFavoritesOnly
         )
+        applyFilters()
+    }
+
+    fun setSortOption(option: SortOption) {
+        _uiState.value = _uiState.value.copy(sortOption = option)
         applyFilters()
     }
 

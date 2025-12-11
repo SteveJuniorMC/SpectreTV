@@ -7,7 +7,9 @@ import androidx.compose.runtime.setValue
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,6 +35,8 @@ class PlayerManager @Inject constructor(
     val exoPlayer: ExoPlayer?
         get() = _exoPlayer
 
+    private var trackSelector: DefaultTrackSelector? = null
+
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(playing: Boolean) {
             isPlaying = playing
@@ -52,10 +56,19 @@ class PlayerManager @Inject constructor(
         isFullScreen = true
 
         if (_exoPlayer == null) {
-            _exoPlayer = ExoPlayer.Builder(context).build().apply {
-                addListener(playerListener)
-                playWhenReady = true
+            trackSelector = DefaultTrackSelector(context).apply {
+                setParameters(
+                    buildUponParameters()
+                        .setPreferredAudioLanguage(Locale.getDefault().language)
+                        .setPreferredTextLanguage(Locale.getDefault().language)
+                )
             }
+            _exoPlayer = ExoPlayer.Builder(context)
+                .setTrackSelector(trackSelector!!)
+                .build().apply {
+                    addListener(playerListener)
+                    playWhenReady = true
+                }
         }
 
         _exoPlayer?.apply {

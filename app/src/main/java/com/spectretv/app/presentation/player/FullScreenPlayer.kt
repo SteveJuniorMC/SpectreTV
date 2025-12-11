@@ -15,20 +15,32 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -42,12 +54,26 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
+import java.util.Locale
 
+data class TrackInfo(
+    val index: Int,
+    val groupIndex: Int,
+    val label: String,
+    val language: String?,
+    val isSelected: Boolean
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun FullScreenPlayer(
@@ -61,6 +87,13 @@ fun FullScreenPlayer(
     val context = LocalContext.current
     var showControls by remember { mutableStateOf(true) }
     var isBuffering by remember { mutableStateOf(false) }
+    var showTrackSelector by remember { mutableStateOf(false) }
+
+    // Track info
+    val audioTracks = remember { mutableStateListOf<TrackInfo>() }
+    val subtitleTracks = remember { mutableStateListOf<TrackInfo>() }
+    var selectedAudioIndex by remember { mutableIntStateOf(0) }
+    var selectedSubtitleIndex by remember { mutableIntStateOf(-1) }
 
     // Handle back button - minimize instead of PiP
     BackHandler {
@@ -87,23 +120,119 @@ fun FullScreenPlayer(
 
     // Auto-hide controls
     LaunchedEffect(showControls) {
-        if (showControls) {
+        if (showControls && !showTrackSelector) {
             delay(4000)
             showControls = false
         }
     }
 
-    // Listen for buffering state
+    // Listen for playback state and tracks
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 isBuffering = playbackState == Player.STATE_BUFFERING
+            }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                val newAudioTracks = mutableListOf<TrackInfo>()
+                val newSubtitleTracks = mutableListOf<TrackInfo>()
+
+                tracks.groups.forEachIndexed { groupIndex, group ->
+                    when (group.type) {
+                        C.TRACK_TYPE_AUDIO -> {
+                            for (i in 0 until group.length) {
+                                val format = group.getTrackFormat(i)
+                                val label = format.label
+                                    ?: format.language?.let { Locale(it).displayLanguage }
+                                    ?: "Audio ${newAudioTracks.size + 1}"
+                                newAudioTracks.add(
+                                    TrackInfo(
+                                        index = i,
+                                        groupIndex = groupIndex,
+                                        label = label,
+                                        language = format.language,
+                                        isSelected = group.isTrackSelected(i)
+                                    )
+                                )
+                            }
+                        }
+                        C.TRACK_TYPE_TEXT -> {
+                            for (i in 0 until group.length) {
+                                val format = group.getTrackFormat(i)
+                                val label = format.label
+                                    ?: format.language?.let { Locale(it).displayLanguage }
+                                    ?: "Subtitle ${newSubtitleTracks.size + 1}"
+                                newSubtitleTracks.add(
+                                    TrackInfo(
+                                        index = i,
+                                        groupIndex = groupIndex,
+                                        label = label,
+                                        language = format.language,
+                                        isSelected = group.isTrackSelected(i)
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
+                audioTracks.clear()
+                audioTracks.addAll(newAudioTracks)
+                subtitleTracks.clear()
+                subtitleTracks.addAll(newSubtitleTracks)
+
+                // Update selected indices
+                selectedAudioIndex = newAudioTracks.indexOfFirst { it.isSelected }.coerceAtLeast(0)
+                selectedSubtitleIndex = newSubtitleTracks.indexOfFirst { it.isSelected }
             }
         }
         exoPlayer?.addListener(listener)
         onDispose {
             exoPlayer?.removeListener(listener)
         }
+    }
+
+    // Helper to select audio track
+    fun selectAudioTrack(index: Int) {
+        if (index < audioTracks.size) {
+            val track = audioTracks[index]
+            val trackGroup = exoPlayer?.currentTracks?.groups?.getOrNull(track.groupIndex)
+            trackGroup?.let { group ->
+                val trackSelector = (exoPlayer as? ExoPlayer)?.trackSelector as? DefaultTrackSelector
+                trackSelector?.setParameters(
+                    trackSelector.buildUponParameters()
+                        .setOverrideForType(
+                            TrackSelectionOverride(group.mediaTrackGroup, track.index)
+                        )
+                )
+            }
+            selectedAudioIndex = index
+        }
+    }
+
+    // Helper to select subtitle track
+    fun selectSubtitleTrack(index: Int) {
+        val trackSelector = (exoPlayer as? ExoPlayer)?.trackSelector as? DefaultTrackSelector
+        if (index == -1) {
+            // Disable subtitles
+            trackSelector?.setParameters(
+                trackSelector.buildUponParameters()
+                    .setIgnoredTextSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                    .setPreferredTextLanguage(null)
+            )
+        } else if (index < subtitleTracks.size) {
+            val track = subtitleTracks[index]
+            val trackGroup = exoPlayer?.currentTracks?.groups?.getOrNull(track.groupIndex)
+            trackGroup?.let { group ->
+                trackSelector?.setParameters(
+                    trackSelector.buildUponParameters()
+                        .setOverrideForType(
+                            TrackSelectionOverride(group.mediaTrackGroup, track.index)
+                        )
+                )
+            }
+        }
+        selectedSubtitleIndex = index
     }
 
     Box(
@@ -154,7 +283,7 @@ fun FullScreenPlayer(
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.4f))
             ) {
-                // Top bar with back and title
+                // Top bar with back, title, and settings
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -175,6 +304,17 @@ fun FullScreenPlayer(
                         color = Color.White,
                         modifier = Modifier.weight(1f)
                     )
+
+                    // Settings button for track selection
+                    if (audioTracks.size > 1 || subtitleTracks.isNotEmpty()) {
+                        IconButton(onClick = { showTrackSelector = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Track settings",
+                                tint = Color.White
+                            )
+                        }
+                    }
                 }
 
                 // Center play/pause
@@ -200,6 +340,126 @@ fun FullScreenPlayer(
                     }
                 }
             }
+        }
+
+        // Track selection bottom sheet
+        if (showTrackSelector) {
+            TrackSelectionSheet(
+                audioTracks = audioTracks,
+                subtitleTracks = subtitleTracks,
+                selectedAudioIndex = selectedAudioIndex,
+                selectedSubtitleIndex = selectedSubtitleIndex,
+                onAudioTrackSelect = { selectAudioTrack(it) },
+                onSubtitleTrackSelect = { selectSubtitleTrack(it) },
+                onDismiss = { showTrackSelector = false }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TrackSelectionSheet(
+    audioTracks: List<TrackInfo>,
+    subtitleTracks: List<TrackInfo>,
+    selectedAudioIndex: Int,
+    selectedSubtitleIndex: Int,
+    onAudioTrackSelect: (Int) -> Unit,
+    onSubtitleTrackSelect: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+    var selectedTab by remember { mutableIntStateOf(0) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 32.dp)
+        ) {
+            TabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("Audio") }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("Subtitles") }
+                )
+            }
+
+            when (selectedTab) {
+                0 -> {
+                    LazyColumn(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        items(audioTracks.indices.toList()) { index ->
+                            val track = audioTracks[index]
+                            TrackItem(
+                                label = track.label,
+                                isSelected = index == selectedAudioIndex,
+                                onClick = { onAudioTrackSelect(index) }
+                            )
+                        }
+                    }
+                }
+                1 -> {
+                    LazyColumn(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        item {
+                            TrackItem(
+                                label = "Off",
+                                isSelected = selectedSubtitleIndex == -1,
+                                onClick = { onSubtitleTrackSelect(-1) }
+                            )
+                        }
+                        items(subtitleTracks.indices.toList()) { index ->
+                            val track = subtitleTracks[index]
+                            TrackItem(
+                                label = track.label,
+                                isSelected = index == selectedSubtitleIndex,
+                                onClick = { onSubtitleTrackSelect(index) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackItem(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+        )
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }

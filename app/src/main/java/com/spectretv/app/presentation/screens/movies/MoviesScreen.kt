@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -68,6 +69,12 @@ fun MoviesScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showSearch by remember { mutableStateOf(false) }
+    val gridState = rememberLazyGridState()
+
+    // Reset scroll when search or genre changes
+    LaunchedEffect(uiState.searchQuery, uiState.selectedGenre) {
+        gridState.scrollToItem(0)
+    }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
@@ -173,6 +180,7 @@ fun MoviesScreen(
                 )
             } else {
                 LazyVerticalGrid(
+                    state = gridState,
                     columns = GridCells.Fixed(3),
                     contentPadding = PaddingValues(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),

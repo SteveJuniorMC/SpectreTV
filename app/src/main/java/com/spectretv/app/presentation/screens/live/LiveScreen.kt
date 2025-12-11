@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -69,6 +72,13 @@ fun LiveScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showSearch by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+
+    // Reset scroll when search or category changes
+    LaunchedEffect(uiState.searchQuery, uiState.selectedGroup) {
+        listState.scrollToItem(0)
+    }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
@@ -175,6 +185,7 @@ fun LiveScreen(
                 )
             } else {
                 LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {

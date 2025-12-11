@@ -1,5 +1,6 @@
 package com.spectretv.app.presentation.screens.player
 
+import android.app.Activity
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
@@ -65,6 +66,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
 import com.spectretv.app.data.local.preferences.VideoQuality
+import com.spectretv.app.presentation.LocalPipHandler
+import com.spectretv.app.presentation.MainActivity
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -80,6 +83,8 @@ fun PlayerScreen(
     val uiState by viewModel.uiState.collectAsState()
     val videoQuality by viewModel.videoQuality.collectAsState(initial = VideoQuality.AUTO)
     val context = LocalContext.current
+    val pipHandler = LocalPipHandler.current
+    val isInPipMode = pipHandler.isInPipMode
 
     var showControls by remember { mutableStateOf(true) }
     var isBuffering by remember { mutableStateOf(true) }
@@ -88,6 +93,15 @@ fun PlayerScreen(
     // Initialize ViewModel
     LaunchedEffect(streamUrl, title) {
         viewModel.initialize(streamUrl, title)
+    }
+
+    // Enable PiP auto-enter when leaving player, disable when leaving screen
+    DisposableEffect(Unit) {
+        val activity = context as? MainActivity
+        activity?.setShouldEnterPipOnLeave(true)
+        onDispose {
+            activity?.setShouldEnterPipOnLeave(false)
+        }
     }
 
     val trackSelector = remember {
@@ -117,7 +131,14 @@ fun PlayerScreen(
             }
     }
 
-    BackHandler(onBack = onBackClick)
+    // Handle back button: enter PiP first, then exit on second press
+    BackHandler {
+        if (isInPipMode) {
+            onBackClick()
+        } else {
+            pipHandler.enterPipMode()
+        }
+    }
 
     // Auto-hide controls
     LaunchedEffect(showControls) {
@@ -303,20 +324,24 @@ fun PlayerScreen(
             }
         }
 
-        if (showControls) {
+        // Hide controls in PiP mode
+        if (showControls && !isInPipMode) {
             PlayerControls(
                 title = title,
                 isPlaying = uiState.isPlaying,
                 hasAudioTracks = uiState.audioTracks.size > 1,
                 hasSubtitleTracks = uiState.subtitleTracks.isNotEmpty(),
-                onBackClick = onBackClick,
+                onBackClick = {
+                    // Enter PiP instead of back
+                    pipHandler.enterPipMode()
+                },
                 onPlayPauseClick = { viewModel.togglePlayPause() },
                 onTrackSettingsClick = { viewModel.toggleTrackSelector() }
             )
         }
 
-        // Track selection bottom sheet
-        if (uiState.showTrackSelector) {
+        // Track selection bottom sheet (not in PiP)
+        if (uiState.showTrackSelector && !isInPipMode) {
             TrackSelectionSheet(
                 audioTracks = uiState.audioTracks,
                 subtitleTracks = uiState.subtitleTracks,

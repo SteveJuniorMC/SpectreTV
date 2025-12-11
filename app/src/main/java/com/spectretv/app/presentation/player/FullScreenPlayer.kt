@@ -70,8 +70,77 @@ data class TrackInfo(
     val groupIndex: Int,
     val label: String,
     val language: String?,
-    val isSelected: Boolean
+    val isSelected: Boolean,
+    val trackType: Int
 )
+
+@androidx.annotation.OptIn(UnstableApi::class)
+private fun parseTracksFromGroups(tracks: Tracks): Pair<List<TrackInfo>, List<TrackInfo>> {
+    val audioTracks = mutableListOf<TrackInfo>()
+    val subtitleTracks = mutableListOf<TrackInfo>()
+
+    tracks.groups.forEachIndexed { groupIndex, group ->
+        when (group.type) {
+            C.TRACK_TYPE_AUDIO -> {
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    val label = format.label
+                        ?: format.language?.let { Locale(it).displayLanguage }
+                        ?: "Audio ${audioTracks.size + 1}"
+                    audioTracks.add(
+                        TrackInfo(
+                            index = i,
+                            groupIndex = groupIndex,
+                            label = label,
+                            language = format.language,
+                            isSelected = group.isTrackSelected(i),
+                            trackType = C.TRACK_TYPE_AUDIO
+                        )
+                    )
+                }
+            }
+            C.TRACK_TYPE_TEXT -> {
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    val label = format.label
+                        ?: format.language?.let { Locale(it).displayLanguage }
+                        ?: "Subtitle ${subtitleTracks.size + 1}"
+                    subtitleTracks.add(
+                        TrackInfo(
+                            index = i,
+                            groupIndex = groupIndex,
+                            label = label,
+                            language = format.language,
+                            isSelected = group.isTrackSelected(i),
+                            trackType = C.TRACK_TYPE_TEXT
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    return Pair(audioTracks, subtitleTracks)
+}
+
+@androidx.annotation.OptIn(UnstableApi::class)
+private fun updateTracks(
+    tracks: Tracks,
+    audioTracksList: MutableList<TrackInfo>,
+    subtitleTracksList: MutableList<TrackInfo>,
+    onIndicesUpdated: (Int, Int) -> Unit
+) {
+    val (newAudio, newSubtitles) = parseTracksFromGroups(tracks)
+
+    audioTracksList.clear()
+    audioTracksList.addAll(newAudio)
+    subtitleTracksList.clear()
+    subtitleTracksList.addAll(newSubtitles)
+
+    val audioIdx = newAudio.indexOfFirst { it.isSelected }.coerceAtLeast(0)
+    val subIdx = newSubtitles.indexOfFirst { it.isSelected }
+    onIndicesUpdated(audioIdx, subIdx)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -91,11 +160,11 @@ fun FullScreenPlayer(
     var isBuffering by remember { mutableStateOf(true) }
     var showTrackSelector by remember { mutableStateOf(false) }
 
-    // Track info
-    val audioTracks = remember { mutableStateListOf<TrackInfo>() }
-    val subtitleTracks = remember { mutableStateListOf<TrackInfo>() }
-    var selectedAudioIndex by remember { mutableIntStateOf(0) }
-    var selectedSubtitleIndex by remember { mutableIntStateOf(-1) }
+    // Track info - keyed by title to reset when stream changes
+    val audioTracks = remember(title) { mutableStateListOf<TrackInfo>() }
+    val subtitleTracks = remember(title) { mutableStateListOf<TrackInfo>() }
+    var selectedAudioIndex by remember(title) { mutableIntStateOf(0) }
+    var selectedSubtitleIndex by remember(title) { mutableIntStateOf(-1) }
 
     // Handle back button - minimize instead of PiP
     BackHandler {
@@ -131,12 +200,18 @@ fun FullScreenPlayer(
         }
     }
 
-    // Listen for playback state and tracks
-    DisposableEffect(exoPlayer) {
+    // Listen for playback state and tracks - keyed on title to refresh when stream changes
+    DisposableEffect(exoPlayer, title) {
         // Check current state immediately
         exoPlayer?.let { player ->
             val state = player.playbackState
             isBuffering = state == Player.STATE_BUFFERING || state == Player.STATE_IDLE
+
+            // Also check current tracks immediately
+            updateTracks(player.currentTracks, audioTracks, subtitleTracks) { audioIdx, subIdx ->
+                selectedAudioIndex = audioIdx
+                selectedSubtitleIndex = subIdx
+            }
         }
 
         val listener = object : Player.Listener {
@@ -145,56 +220,10 @@ fun FullScreenPlayer(
             }
 
             override fun onTracksChanged(tracks: Tracks) {
-                val newAudioTracks = mutableListOf<TrackInfo>()
-                val newSubtitleTracks = mutableListOf<TrackInfo>()
-
-                tracks.groups.forEachIndexed { groupIndex, group ->
-                    when (group.type) {
-                        C.TRACK_TYPE_AUDIO -> {
-                            for (i in 0 until group.length) {
-                                val format = group.getTrackFormat(i)
-                                val label = format.label
-                                    ?: format.language?.let { Locale(it).displayLanguage }
-                                    ?: "Audio ${newAudioTracks.size + 1}"
-                                newAudioTracks.add(
-                                    TrackInfo(
-                                        index = i,
-                                        groupIndex = groupIndex,
-                                        label = label,
-                                        language = format.language,
-                                        isSelected = group.isTrackSelected(i)
-                                    )
-                                )
-                            }
-                        }
-                        C.TRACK_TYPE_TEXT -> {
-                            for (i in 0 until group.length) {
-                                val format = group.getTrackFormat(i)
-                                val label = format.label
-                                    ?: format.language?.let { Locale(it).displayLanguage }
-                                    ?: "Subtitle ${newSubtitleTracks.size + 1}"
-                                newSubtitleTracks.add(
-                                    TrackInfo(
-                                        index = i,
-                                        groupIndex = groupIndex,
-                                        label = label,
-                                        language = format.language,
-                                        isSelected = group.isTrackSelected(i)
-                                    )
-                                )
-                            }
-                        }
-                    }
+                updateTracks(tracks, audioTracks, subtitleTracks) { audioIdx, subIdx ->
+                    selectedAudioIndex = audioIdx
+                    selectedSubtitleIndex = subIdx
                 }
-
-                audioTracks.clear()
-                audioTracks.addAll(newAudioTracks)
-                subtitleTracks.clear()
-                subtitleTracks.addAll(newSubtitleTracks)
-
-                // Update selected indices
-                selectedAudioIndex = newAudioTracks.indexOfFirst { it.isSelected }.coerceAtLeast(0)
-                selectedSubtitleIndex = newSubtitleTracks.indexOfFirst { it.isSelected }
             }
         }
         exoPlayer?.addListener(listener)

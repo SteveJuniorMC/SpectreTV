@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- TV Icon -->
+    <group
+        android:translateX="27"
+        android:translateY="27">
+
+        <!-- TV Body -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M48,8H6C2.69,8 0,10.69 0,14V38C0,41.31 2.69,44 6,44H20V48H14V52H40V48H34V44H48C51.31,44 54,41.31 54,38V14C54,10.69 51.31,8 48,8ZM48,38H6V14H48V38Z"/>
+
+        <!-- Play button -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M22,20L22,32L34,26Z"/>
+    </group>
+</vector>

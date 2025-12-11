@@ -85,8 +85,10 @@ fun FullScreenPlayer(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
     var showControls by remember { mutableStateOf(true) }
-    var isBuffering by remember { mutableStateOf(false) }
+    // Start with buffering true until we know the player is ready
+    var isBuffering by remember { mutableStateOf(true) }
     var showTrackSelector by remember { mutableStateOf(false) }
 
     // Track info
@@ -102,7 +104,7 @@ fun FullScreenPlayer(
 
     // Hide system bars for immersive mode
     DisposableEffect(Unit) {
-        val window = (context as? Activity)?.window
+        val window = activity?.window
         window?.let {
             WindowCompat.setDecorFitsSystemWindows(it, false)
             WindowInsetsControllerCompat(it, it.decorView).apply {
@@ -112,8 +114,11 @@ fun FullScreenPlayer(
         }
         onDispose {
             window?.let {
-                WindowCompat.setDecorFitsSystemWindows(it, true)
-                WindowInsetsControllerCompat(it, it.decorView).show(WindowInsetsCompat.Type.systemBars())
+                // Show system bars but keep edge-to-edge (don't set decorFitsSystemWindows)
+                val controller = WindowInsetsControllerCompat(it, it.decorView)
+                controller.show(WindowInsetsCompat.Type.systemBars())
+                // Re-apply dark status bar icons for dark theme
+                controller.isAppearanceLightStatusBars = false
             }
         }
     }
@@ -128,6 +133,12 @@ fun FullScreenPlayer(
 
     // Listen for playback state and tracks
     DisposableEffect(exoPlayer) {
+        // Check current state immediately
+        exoPlayer?.let { player ->
+            val state = player.playbackState
+            isBuffering = state == Player.STATE_BUFFERING || state == Player.STATE_IDLE
+        }
+
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 isBuffering = playbackState == Player.STATE_BUFFERING
@@ -317,26 +328,28 @@ fun FullScreenPlayer(
                     }
                 }
 
-                // Center play/pause
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.3f))
-                            .clickable(onClick = onPlayPause),
-                        contentAlignment = Alignment.Center
+                // Center play/pause (hide when buffering)
+                if (!isBuffering) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Pause" else "Play",
-                            tint = Color.White,
-                            modifier = Modifier.size(48.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.3f))
+                                .clickable(onClick = onPlayPause),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Pause" else "Play",
+                                tint = Color.White,
+                                modifier = Modifier.size(48.dp)
+                            )
+                        }
                     }
                 }
             }

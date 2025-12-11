@@ -1,5 +1,7 @@
 package com.spectretv.app.di
 
+import com.google.gson.GsonBuilder
+import com.spectretv.app.data.remote.LenientListTypeAdapterFactory
 import com.spectretv.app.data.remote.api.XtreamApi
 import dagger.Module
 import dagger.Provides
@@ -34,10 +36,15 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        // Custom Gson that handles API returning objects instead of arrays
+        val gson = GsonBuilder()
+            .registerTypeAdapterFactory(LenientListTypeAdapterFactory())
+            .create()
+
         return Retrofit.Builder()
             .baseUrl("https://placeholder.com/") // Base URL not used, we pass full URLs
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
 

@@ -195,4 +195,11 @@ class SeriesViewModel @Inject constructor(
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
+
+    fun resetSearch() {
+        if (_uiState.value.searchQuery.isNotEmpty()) {
+            _uiState.value = _uiState.value.copy(searchQuery = "")
+            applyFilters()
+        }
+    }
 }

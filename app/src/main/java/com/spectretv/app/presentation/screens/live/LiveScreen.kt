@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,6 +39,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -153,7 +155,7 @@ fun LiveScreen(
                         )
                     }
                     IconButton(
-                        onClick = { viewModel.refreshChannels() },
+                        onClick = { viewModel.loadChannels() },
                         enabled = !uiState.isLoading
                     ) {
                         if (uiState.isLoading) {
@@ -178,8 +180,16 @@ fun LiveScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Loading progress indicator
+            if (uiState.isLoading && uiState.loadingProgress != null) {
+                LoadingProgressCard(
+                    progress = uiState.loadingProgress!!,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+
             // Category chips
-            if (uiState.groups.isNotEmpty()) {
+            if (uiState.groups.isNotEmpty() && !uiState.isLoading) {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -205,10 +215,12 @@ fun LiveScreen(
             if (uiState.filteredChannels.isEmpty() && !uiState.isLoading) {
                 EmptyState(
                     hasSources = uiState.sources.isNotEmpty(),
+                    hasChannels = uiState.channels.isNotEmpty(),
                     showFavoritesOnly = uiState.showFavoritesOnly,
-                    hasSearchQuery = uiState.searchQuery.isNotBlank()
+                    hasSearchQuery = uiState.searchQuery.isNotBlank(),
+                    onLoadClick = { viewModel.loadChannels() }
                 )
-            } else {
+            } else if (!uiState.isLoading) {
                 LazyColumn(
                     state = listState,
                     contentPadding = PaddingValues(16.dp),
@@ -321,8 +333,10 @@ private fun ChannelCard(
 @Composable
 private fun EmptyState(
     hasSources: Boolean,
+    hasChannels: Boolean,
     showFavoritesOnly: Boolean,
-    hasSearchQuery: Boolean
+    hasSearchQuery: Boolean,
+    onLoadClick: () -> Unit
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -340,7 +354,8 @@ private fun EmptyState(
                 text = when {
                     hasSearchQuery -> "No channels found"
                     showFavoritesOnly -> "No favorite channels"
-                    hasSources -> "No channels yet"
+                    hasChannels -> "No matching channels"
+                    hasSources -> "Load channels from your sources"
                     else -> "No sources added"
                 },
                 style = MaterialTheme.typography.titleMedium,
@@ -351,12 +366,84 @@ private fun EmptyState(
                 text = when {
                     hasSearchQuery -> "Try a different search term"
                     showFavoritesOnly -> "Mark channels as favorites to see them here"
-                    hasSources -> "Tap refresh to load channels"
+                    hasChannels -> "Try a different filter"
+                    hasSources -> "Tap the button below to load channels"
                     else -> "Add an IPTV source in Settings"
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
+
+            // Show load button if sources exist but no channels loaded
+            if (hasSources && !hasChannels && !hasSearchQuery && !showFavoritesOnly) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(onClick = onLoadClick) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Load Channels")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingProgressCard(
+    progress: com.spectretv.app.domain.repository.LoadingProgress,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Loading channels...",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (progress.totalCategories > 0) {
+                val progressFraction = progress.categoriesLoaded.toFloat() / progress.totalCategories
+                LinearProgressIndicator(
+                    progress = { progressFraction },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "${progress.currentCategory} (${progress.categoriesLoaded} of ${progress.totalCategories})",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = progress.currentCategory.ifEmpty { "Starting..." },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (progress.itemsLoaded > 0) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${progress.itemsLoaded} channels loaded",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
         }
     }
 }

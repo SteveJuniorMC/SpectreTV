@@ -15,6 +15,10 @@ interface VodRepository {
     fun searchMovies(query: String): Flow<List<Movie>>
     suspend fun getMovieById(id: String): Movie?
     suspend fun refreshMovies(source: Source)
+    suspend fun refreshMoviesWithProgress(
+        source: Source,
+        onProgress: (LoadingProgress) -> Unit
+    )
     suspend fun toggleMovieFavorite(movieId: String)
 
     // Series
@@ -26,6 +30,10 @@ interface VodRepository {
     suspend fun getSeriesById(id: String): Series?
     suspend fun getEpisodes(seriesId: String): List<Episode>
     suspend fun refreshSeries(source: Source)
+    suspend fun refreshSeriesWithProgress(
+        source: Source,
+        onProgress: (LoadingProgress) -> Unit
+    )
     suspend fun refreshSeriesWithDebug(source: Source): String  // Returns debug info
     suspend fun toggleSeriesFavorite(seriesId: String)
 

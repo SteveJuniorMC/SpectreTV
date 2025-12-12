@@ -14,6 +14,7 @@ import com.spectretv.app.domain.model.Movie
 import com.spectretv.app.domain.model.Series
 import com.spectretv.app.domain.model.Source
 import com.spectretv.app.domain.model.SourceType
+import com.spectretv.app.domain.repository.LoadingProgress
 import com.spectretv.app.domain.repository.VodRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -90,6 +91,59 @@ class VodRepositoryImpl @Inject constructor(
                 )
             }
             movieDao.insertMovies(entities)
+        }
+    }
+
+    override suspend fun refreshMoviesWithProgress(
+        source: Source,
+        onProgress: (LoadingProgress) -> Unit
+    ) {
+        if (source.type != SourceType.XTREAM) return
+
+        withContext(Dispatchers.IO) {
+            // Get categories first
+            val categories = xtreamClient.getVodCategories(source)
+            val totalCategories = categories.size
+            var itemsLoaded = 0
+
+            // Preserve favorites
+            val existingMovies = movieDao.getMoviesBySource(source.id).first()
+            val existingFavorites = existingMovies
+                .filter { it.isFavorite }
+                .map { it.id }
+                .toSet()
+
+            // Delete old movies
+            movieDao.deleteMoviesBySource(source.id)
+
+            // Fetch by category
+            categories.forEachIndexed { index, category ->
+                val categoryId = category.categoryId ?: return@forEachIndexed
+                val categoryName = category.categoryName ?: "Uncategorized"
+
+                onProgress(LoadingProgress(
+                    currentCategory = categoryName,
+                    categoriesLoaded = index,
+                    totalCategories = totalCategories,
+                    itemsLoaded = itemsLoaded
+                ))
+
+                val movies = xtreamClient.getMoviesByCategory(source, categoryId, categoryName)
+                val entities = movies.map { movie ->
+                    MovieEntity.fromDomain(
+                        movie.copy(isFavorite = existingFavorites.contains(movie.id))
+                    )
+                }
+                movieDao.insertMovies(entities)
+                itemsLoaded += movies.size
+            }
+
+            onProgress(LoadingProgress(
+                currentCategory = "Done",
+                categoriesLoaded = totalCategories,
+                totalCategories = totalCategories,
+                itemsLoaded = itemsLoaded
+            ))
         }
     }
 
@@ -202,6 +256,60 @@ class VodRepositoryImpl @Inject constructor(
                 debugLines.add(e.stackTraceToString().lines().take(5).joinToString("\n"))
             }
             debugLines.joinToString("\n")
+        }
+    }
+
+    override suspend fun refreshSeriesWithProgress(
+        source: Source,
+        onProgress: (LoadingProgress) -> Unit
+    ) {
+        if (source.type != SourceType.XTREAM) return
+
+        withContext(Dispatchers.IO) {
+            // Get categories first
+            val categories = xtreamClient.getSeriesCategories(source)
+            val totalCategories = categories.size
+            var itemsLoaded = 0
+
+            // Preserve favorites
+            val existingSeries = seriesDao.getSeriesBySource(source.id).first()
+            val existingFavorites = existingSeries
+                .filter { it.isFavorite }
+                .map { it.id }
+                .toSet()
+
+            // Delete old series and episodes
+            episodeDao.deleteEpisodesBySource(source.id)
+            seriesDao.deleteSeriesBySource(source.id)
+
+            // Fetch by category
+            categories.forEachIndexed { index, category ->
+                val categoryId = category.categoryId ?: return@forEachIndexed
+                val categoryName = category.categoryName ?: "Uncategorized"
+
+                onProgress(LoadingProgress(
+                    currentCategory = categoryName,
+                    categoriesLoaded = index,
+                    totalCategories = totalCategories,
+                    itemsLoaded = itemsLoaded
+                ))
+
+                val seriesList = xtreamClient.getSeriesByCategory(source, categoryId, categoryName)
+                val entities = seriesList.map { series ->
+                    SeriesEntity.fromDomain(
+                        series.copy(isFavorite = existingFavorites.contains(series.id))
+                    )
+                }
+                seriesDao.insertSeries(entities)
+                itemsLoaded += seriesList.size
+            }
+
+            onProgress(LoadingProgress(
+                currentCategory = "Done",
+                categoriesLoaded = totalCategories,
+                totalCategories = totalCategories,
+                itemsLoaded = itemsLoaded
+            ))
         }
     }
 

@@ -74,6 +74,31 @@ class XtreamClient @Inject constructor(
         }
     }
 
+    suspend fun getChannelsByCategory(source: Source, categoryId: String, categoryName: String): List<Channel> {
+        val baseUrl = buildPlayerApiUrl(source.serverUrl!!)
+
+        val streams = xtreamApi.getLiveStreamsByCategory(
+            baseUrl = baseUrl,
+            username = source.username!!,
+            password = source.password!!,
+            categoryId = categoryId
+        )
+
+        return streams.mapNotNull { stream ->
+            stream.streamId?.let { streamId ->
+                Channel(
+                    id = "${source.id}_xtream_$streamId",
+                    name = stream.name ?: "Unknown",
+                    streamUrl = buildLiveStreamUrl(source, streamId),
+                    logoUrl = stream.streamIcon?.takeIf { it.isNotBlank() },
+                    group = categoryName,
+                    epgId = stream.epgChannelId,
+                    sourceId = source.id
+                )
+            }
+        }
+    }
+
     // VOD (Movies)
     suspend fun getVodCategories(source: Source): List<XtreamCategory> {
         val baseUrl = buildPlayerApiUrl(source.serverUrl!!)
@@ -125,6 +150,40 @@ class XtreamClient @Inject constructor(
         }
     }
 
+    suspend fun getMoviesByCategory(source: Source, categoryId: String, categoryName: String): List<Movie> {
+        val baseUrl = buildPlayerApiUrl(source.serverUrl!!)
+
+        return try {
+            val streams = xtreamApi.getVodStreamsByCategory(
+                baseUrl = baseUrl,
+                username = source.username!!,
+                password = source.password!!,
+                categoryId = categoryId
+            )
+
+            streams.mapNotNull { stream ->
+                stream.streamId?.let { streamId ->
+                    val extension = stream.containerExtension ?: "mp4"
+                    Movie(
+                        id = "${source.id}_vod_$streamId",
+                        name = stream.name ?: "Unknown",
+                        streamUrl = buildVodStreamUrl(source, streamId, extension),
+                        posterUrl = stream.streamIcon?.takeIf { it.isNotBlank() },
+                        backdropUrl = stream.backdropPath,
+                        plot = stream.plot,
+                        genre = categoryName,
+                        year = stream.releaseDate?.take(4),
+                        rating = stream.rating,
+                        sourceId = source.id,
+                        containerExtension = extension
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     // Series
     suspend fun getSeriesCategories(source: Source): List<XtreamCategory> {
         val baseUrl = buildPlayerApiUrl(source.serverUrl!!)
@@ -141,6 +200,40 @@ class XtreamClient @Inject constructor(
 
     suspend fun getSeries(source: Source): List<Series> {
         return getSeriesWithDebug(source).series
+    }
+
+    suspend fun getSeriesByCategory(source: Source, categoryId: String, categoryName: String): List<Series> {
+        val baseUrl = buildPlayerApiUrl(source.serverUrl!!)
+
+        return try {
+            val seriesList = xtreamApi.getSeriesByCategory(
+                baseUrl = baseUrl,
+                username = source.username!!,
+                password = source.password!!,
+                categoryId = categoryId
+            )
+
+            seriesList.mapNotNull { series ->
+                val id = series.seriesId ?: series.streamId
+                id?.let { seriesIdValue ->
+                    val releaseYear = (series.releaseDate ?: series.releaseDateAlt)?.take(4)
+                    Series(
+                        id = "${source.id}_series_$seriesIdValue",
+                        name = series.name ?: "Unknown",
+                        posterUrl = series.cover?.takeIf { it.isNotBlank() }
+                            ?: series.streamIcon?.takeIf { it.isNotBlank() },
+                        backdropUrl = series.backdropPath,
+                        plot = series.plot,
+                        genre = categoryName,
+                        year = releaseYear,
+                        rating = series.rating,
+                        sourceId = source.id
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     suspend fun getSeriesWithDebug(source: Source): SeriesResult {

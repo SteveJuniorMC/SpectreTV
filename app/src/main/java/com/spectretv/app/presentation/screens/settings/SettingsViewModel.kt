@@ -6,6 +6,7 @@ import com.spectretv.app.data.local.preferences.AppPreferences
 import com.spectretv.app.data.local.preferences.VideoQuality
 import com.spectretv.app.domain.model.Source
 import com.spectretv.app.domain.model.SourceType
+import com.spectretv.app.data.remote.XtreamClient
 import com.spectretv.app.domain.repository.ChannelRepository
 import com.spectretv.app.domain.repository.SourceRepository
 import com.spectretv.app.domain.repository.VodRepository
@@ -22,6 +23,7 @@ data class SettingsUiState(
     val sources: List<Source> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
+    val successMessage: String? = null,
     val showAddDialog: Boolean = false
 )
 
@@ -30,6 +32,7 @@ class SettingsViewModel @Inject constructor(
     private val sourceRepository: SourceRepository,
     private val channelRepository: ChannelRepository,
     private val vodRepository: VodRepository,
+    private val xtreamClient: XtreamClient,
     private val appPreferences: AppPreferences
 ) : ViewModel() {
 
@@ -74,12 +77,23 @@ class SettingsViewModel @Inject constructor(
                     type = SourceType.M3U,
                     url = url
                 )
-                val sourceId = sourceRepository.addSource(source)
-                val savedSource = sourceRepository.getSourceById(sourceId)
-                savedSource?.let {
-                    channelRepository.refreshChannels(it)
+
+                // Validate URL is accessible before saving
+                val isValid = channelRepository.validateM3USource(source)
+                if (!isValid) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = "Could not connect to M3U URL. Please check the URL and try again."
+                    )
+                    return@launch
                 }
-                _uiState.value = _uiState.value.copy(isLoading = false)
+
+                // Save source without loading content
+                sourceRepository.addSource(source)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    successMessage = "Source added successfully. Go to Live TV to load channels."
+                )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -100,15 +114,23 @@ class SettingsViewModel @Inject constructor(
                     username = username,
                     password = password
                 )
-                val sourceId = sourceRepository.addSource(source)
-                val savedSource = sourceRepository.getSourceById(sourceId)
-                savedSource?.let {
-                    // Refresh all content types for Xtream sources
-                    channelRepository.refreshChannels(it)
-                    vodRepository.refreshMovies(it)
-                    vodRepository.refreshSeries(it)
+
+                // Validate credentials before saving
+                val isAuthenticated = xtreamClient.authenticate(source)
+                if (!isAuthenticated) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = "Authentication failed. Please check server URL, username, and password."
+                    )
+                    return@launch
                 }
-                _uiState.value = _uiState.value.copy(isLoading = false)
+
+                // Save source without loading content
+                sourceRepository.addSource(source)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    successMessage = "Source added successfully. Go to content tabs to load channels, movies, and series."
+                )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -153,5 +175,9 @@ class SettingsViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    fun clearSuccessMessage() {
+        _uiState.value = _uiState.value.copy(successMessage = null)
     }
 }

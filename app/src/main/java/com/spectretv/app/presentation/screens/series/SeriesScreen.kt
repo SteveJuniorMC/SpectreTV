@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +43,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -189,7 +191,7 @@ fun SeriesScreen(
                         )
                     }
                     IconButton(
-                        onClick = { viewModel.refreshSeries() },
+                        onClick = { viewModel.loadSeries() },
                         enabled = !uiState.isLoading
                     ) {
                         if (uiState.isLoading) {
@@ -214,7 +216,15 @@ fun SeriesScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (uiState.genres.isNotEmpty()) {
+            // Loading progress indicator
+            if (uiState.isLoading && uiState.loadingProgress != null) {
+                LoadingProgressCard(
+                    progress = uiState.loadingProgress!!,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+
+            if (uiState.genres.isNotEmpty() && !uiState.isLoading) {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -239,10 +249,12 @@ fun SeriesScreen(
             if (uiState.filteredSeries.isEmpty() && !uiState.isLoading) {
                 EmptyState(
                     hasSources = uiState.sources.isNotEmpty(),
+                    hasSeries = uiState.series.isNotEmpty(),
                     showFavoritesOnly = uiState.showFavoritesOnly,
-                    hasSearchQuery = uiState.searchQuery.isNotBlank()
+                    hasSearchQuery = uiState.searchQuery.isNotBlank(),
+                    onLoadClick = { viewModel.loadSeries() }
                 )
-            } else {
+            } else if (!uiState.isLoading) {
                 LazyVerticalGrid(
                     state = gridState,
                     columns = GridCells.Fixed(3),
@@ -377,8 +389,10 @@ private fun SeriesCard(
 @Composable
 private fun EmptyState(
     hasSources: Boolean,
+    hasSeries: Boolean,
     showFavoritesOnly: Boolean,
-    hasSearchQuery: Boolean
+    hasSearchQuery: Boolean,
+    onLoadClick: () -> Unit
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -399,7 +413,8 @@ private fun EmptyState(
                 text = when {
                     hasSearchQuery -> "No series found"
                     showFavoritesOnly -> "No favorite series"
-                    hasSources -> "No series yet"
+                    hasSeries -> "No matching series"
+                    hasSources -> "Load series from your sources"
                     else -> "No sources added"
                 },
                 style = MaterialTheme.typography.titleMedium,
@@ -410,12 +425,84 @@ private fun EmptyState(
                 text = when {
                     hasSearchQuery -> "Try a different search term"
                     showFavoritesOnly -> "Mark series as favorites to see them here"
-                    hasSources -> "Tap refresh to load series"
+                    hasSeries -> "Try a different filter"
+                    hasSources -> "Tap the button below to load series"
                     else -> "Add an IPTV source in Settings"
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
+
+            // Show load button if sources exist but no series loaded
+            if (hasSources && !hasSeries && !hasSearchQuery && !showFavoritesOnly) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(onClick = onLoadClick) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Load Series")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingProgressCard(
+    progress: com.spectretv.app.domain.repository.LoadingProgress,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Loading series...",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (progress.totalCategories > 0) {
+                val progressFraction = progress.categoriesLoaded.toFloat() / progress.totalCategories
+                LinearProgressIndicator(
+                    progress = { progressFraction },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "${progress.currentCategory} (${progress.categoriesLoaded} of ${progress.totalCategories})",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = progress.currentCategory.ifEmpty { "Starting..." },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (progress.itemsLoaded > 0) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${progress.itemsLoaded} series loaded",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
         }
     }
 }

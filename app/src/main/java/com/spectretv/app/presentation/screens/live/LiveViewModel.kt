@@ -6,6 +6,7 @@ import com.spectretv.app.data.local.entity.WatchHistoryEntity
 import com.spectretv.app.domain.model.Channel
 import com.spectretv.app.domain.model.Source
 import com.spectretv.app.domain.repository.ChannelRepository
+import com.spectretv.app.domain.repository.LoadingProgress
 import com.spectretv.app.domain.repository.SourceRepository
 import com.spectretv.app.domain.repository.WatchHistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,6 +26,7 @@ data class LiveUiState(
     val searchQuery: String = "",
     val showFavoritesOnly: Boolean = false,
     val isLoading: Boolean = false,
+    val loadingProgress: LoadingProgress? = null,
     val error: String? = null,
     val sources: List<Source> = emptyList(),
     val recentlyWatched: List<WatchHistoryEntity> = emptyList()
@@ -129,19 +131,29 @@ class LiveViewModel @Inject constructor(
         applyFilters()
     }
 
-    fun refreshChannels() {
+    fun loadChannels() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                loadingProgress = LoadingProgress(),
+                error = null
+            )
             try {
                 val sources = sourceRepository.getActiveSources().first()
                 sources.forEach { source ->
-                    channelRepository.refreshChannels(source)
+                    channelRepository.refreshChannelsWithProgress(source) { progress ->
+                        _uiState.value = _uiState.value.copy(loadingProgress = progress)
+                    }
                 }
-                _uiState.value = _uiState.value.copy(isLoading = false)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    loadingProgress = null
+                )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = e.message ?: "Failed to refresh channels"
+                    loadingProgress = null,
+                    error = e.message ?: "Failed to load channels"
                 )
             }
         }

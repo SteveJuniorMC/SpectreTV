@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.spectretv.app.data.local.entity.WatchHistoryEntity
 import com.spectretv.app.domain.model.Movie
 import com.spectretv.app.domain.model.Source
+import com.spectretv.app.domain.repository.LoadingProgress
 import com.spectretv.app.domain.repository.SourceRepository
 import com.spectretv.app.domain.repository.VodRepository
 import com.spectretv.app.domain.repository.WatchHistoryRepository
@@ -35,6 +36,7 @@ data class MoviesUiState(
     val showFavoritesOnly: Boolean = false,
     val sortOption: SortOption = SortOption.NAME_ASC,
     val isLoading: Boolean = false,
+    val loadingProgress: LoadingProgress? = null,
     val error: String? = null,
     val sources: List<Source> = emptyList(),
     val recentlyWatched: List<WatchHistoryEntity> = emptyList()
@@ -153,19 +155,29 @@ class MoviesViewModel @Inject constructor(
         applyFilters()
     }
 
-    fun refreshMovies() {
+    fun loadMovies() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                loadingProgress = LoadingProgress(),
+                error = null
+            )
             try {
                 val sources = sourceRepository.getActiveSources().first()
                 sources.forEach { source ->
-                    vodRepository.refreshMovies(source)
+                    vodRepository.refreshMoviesWithProgress(source) { progress ->
+                        _uiState.value = _uiState.value.copy(loadingProgress = progress)
+                    }
                 }
-                _uiState.value = _uiState.value.copy(isLoading = false)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    loadingProgress = null
+                )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = e.message ?: "Failed to refresh movies"
+                    loadingProgress = null,
+                    error = e.message ?: "Failed to load movies"
                 )
             }
         }

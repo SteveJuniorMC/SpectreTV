@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +43,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -189,7 +191,7 @@ fun MoviesScreen(
                         )
                     }
                     IconButton(
-                        onClick = { viewModel.refreshMovies() },
+                        onClick = { viewModel.loadMovies() },
                         enabled = !uiState.isLoading
                     ) {
                         if (uiState.isLoading) {
@@ -214,8 +216,16 @@ fun MoviesScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Loading progress indicator
+            if (uiState.isLoading && uiState.loadingProgress != null) {
+                LoadingProgressCard(
+                    progress = uiState.loadingProgress!!,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+
             // Genre chips
-            if (uiState.genres.isNotEmpty()) {
+            if (uiState.genres.isNotEmpty() && !uiState.isLoading) {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -240,10 +250,12 @@ fun MoviesScreen(
             if (uiState.filteredMovies.isEmpty() && !uiState.isLoading) {
                 EmptyState(
                     hasSources = uiState.sources.isNotEmpty(),
+                    hasMovies = uiState.movies.isNotEmpty(),
                     showFavoritesOnly = uiState.showFavoritesOnly,
-                    hasSearchQuery = uiState.searchQuery.isNotBlank()
+                    hasSearchQuery = uiState.searchQuery.isNotBlank(),
+                    onLoadClick = { viewModel.loadMovies() }
                 )
-            } else {
+            } else if (!uiState.isLoading) {
                 LazyVerticalGrid(
                     state = gridState,
                     columns = GridCells.Fixed(3),
@@ -380,8 +392,10 @@ private fun MovieCard(
 @Composable
 private fun EmptyState(
     hasSources: Boolean,
+    hasMovies: Boolean,
     showFavoritesOnly: Boolean,
-    hasSearchQuery: Boolean
+    hasSearchQuery: Boolean,
+    onLoadClick: () -> Unit
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -399,7 +413,8 @@ private fun EmptyState(
                 text = when {
                     hasSearchQuery -> "No movies found"
                     showFavoritesOnly -> "No favorite movies"
-                    hasSources -> "No movies yet"
+                    hasMovies -> "No matching movies"
+                    hasSources -> "Load movies from your sources"
                     else -> "No sources added"
                 },
                 style = MaterialTheme.typography.titleMedium,
@@ -410,12 +425,84 @@ private fun EmptyState(
                 text = when {
                     hasSearchQuery -> "Try a different search term"
                     showFavoritesOnly -> "Mark movies as favorites to see them here"
-                    hasSources -> "Tap refresh to load movies"
+                    hasMovies -> "Try a different filter"
+                    hasSources -> "Tap the button below to load movies"
                     else -> "Add an IPTV source in Settings"
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
+
+            // Show load button if sources exist but no movies loaded
+            if (hasSources && !hasMovies && !hasSearchQuery && !showFavoritesOnly) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(onClick = onLoadClick) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Load Movies")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingProgressCard(
+    progress: com.spectretv.app.domain.repository.LoadingProgress,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Loading movies...",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (progress.totalCategories > 0) {
+                val progressFraction = progress.categoriesLoaded.toFloat() / progress.totalCategories
+                LinearProgressIndicator(
+                    progress = { progressFraction },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "${progress.currentCategory} (${progress.categoriesLoaded} of ${progress.totalCategories})",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = progress.currentCategory.ifEmpty { "Starting..." },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (progress.itemsLoaded > 0) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${progress.itemsLoaded} movies loaded",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
         }
     }
 }

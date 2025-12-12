@@ -417,8 +417,8 @@ private fun LoadingProgressCard(
             if (progress.totalCategories > 0) {
                 val progressFraction = progress.categoriesLoaded.toFloat() / progress.totalCategories
                 LinearProgressIndicator(
-                    progress = { progressFraction },
-                    modifier = Modifier.fillMaxWidth(),
+                    progress = progressFraction,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(

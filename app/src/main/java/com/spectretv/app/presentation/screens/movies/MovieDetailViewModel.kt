@@ -66,9 +66,25 @@ class MovieDetailViewModel @Inject constructor(
                         resumePosition = history.positionMs,
                         progressPercent = progress
                     )
+                } else {
+                    // Clear resume state if completed
+                    _uiState.value = _uiState.value.copy(
+                        resumePosition = null,
+                        progressPercent = 0f
+                    )
                 }
+            } else {
+                // Clear resume state if no history
+                _uiState.value = _uiState.value.copy(
+                    resumePosition = null,
+                    progressPercent = 0f
+                )
             }
         }
+    }
+
+    fun refreshWatchHistory() {
+        loadWatchHistory()
     }
 
     fun toggleFavorite() {

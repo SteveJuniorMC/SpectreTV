@@ -54,9 +54,15 @@ class LiveViewModel @Inject constructor(
             ) { channels, groups, sources, recentlyWatched ->
                 CombinedData(channels, groups, sources, recentlyWatched)
             }.collect { data ->
+                val groupList = mutableListOf("All")
+                if (data.recentlyWatched.isNotEmpty()) {
+                    groupList.add("History")
+                }
+                groupList.addAll(data.groups)
+
                 _uiState.value = _uiState.value.copy(
                     channels = data.channels,
-                    groups = listOf("All") + data.groups,
+                    groups = groupList,
                     sources = data.sources,
                     recentlyWatched = data.recentlyWatched,
                     isLoading = false
@@ -75,11 +81,19 @@ class LiveViewModel @Inject constructor(
 
     private fun applyFilters() {
         val state = _uiState.value
-        var filtered = state.channels
+        var filtered: List<Channel>
 
-        // Apply group filter
-        if (state.selectedGroup != null) {
-            filtered = filtered.filter { it.group == state.selectedGroup }
+        // Handle History filter specially
+        if (state.selectedGroup == "History") {
+            val historyIds = state.recentlyWatched.map { it.contentId }
+            filtered = historyIds.mapNotNull { id -> state.channels.find { it.id == id } }
+        } else {
+            filtered = state.channels
+
+            // Apply group filter
+            if (state.selectedGroup != null) {
+                filtered = filtered.filter { it.group == state.selectedGroup }
+            }
         }
 
         // Apply favorites filter

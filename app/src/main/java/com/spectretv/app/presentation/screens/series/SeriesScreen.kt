@@ -42,7 +42,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -67,14 +66,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.spectretv.app.data.local.entity.WatchHistoryEntity
 import com.spectretv.app.domain.model.Series
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SeriesScreen(
     onSeriesClick: (Series) -> Unit,
-    onContinueWatchingClick: (WatchHistoryEntity) -> Unit = {},
     viewModel: SeriesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -192,31 +189,6 @@ fun SeriesScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Continue Watching section
-            if (uiState.continueWatching.isNotEmpty()) {
-                Column(modifier = Modifier.padding(top = 8.dp)) {
-                    Text(
-                        text = "Continue Watching",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(
-                            items = uiState.continueWatching,
-                            key = { it.contentId }
-                        ) { historyItem ->
-                            ContinueWatchingEpisodeCard(
-                                historyItem = historyItem,
-                                onClick = { onContinueWatchingClick(historyItem) }
-                            )
-                        }
-                    }
-                }
-            }
-
             if (uiState.genres.isNotEmpty()) {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -449,75 +421,6 @@ private fun EmptyState(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ContinueWatchingEpisodeCard(
-    historyItem: WatchHistoryEntity,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .width(160.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                    .background(MaterialTheme.colorScheme.surface),
-                contentAlignment = Alignment.Center
-            ) {
-                if (historyItem.posterUrl != null) {
-                    AsyncImage(
-                        model = historyItem.posterUrl,
-                        contentDescription = historyItem.name,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Tv,
-                        contentDescription = null,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    )
-                }
-            }
-
-            // Progress bar
-            LinearProgressIndicator(
-                progress = historyItem.progressPercent,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surface
-            )
-
-            Column(modifier = Modifier.padding(8.dp)) {
-                Text(
-                    text = historyItem.seriesName ?: historyItem.name,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (historyItem.seasonNumber != null && historyItem.episodeNumber != null) {
-                    Text(
-                        text = "S${historyItem.seasonNumber} E${historyItem.episodeNumber}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
         }
     }

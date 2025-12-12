@@ -38,7 +38,7 @@ data class SeriesUiState(
     val error: String? = null,
     val sources: List<Source> = emptyList(),
     val debugInfo: String? = null,
-    val continueWatching: List<WatchHistoryEntity> = emptyList()
+    val recentlyWatched: List<WatchHistoryEntity> = emptyList()
 )
 
 @HiltViewModel
@@ -62,14 +62,20 @@ class SeriesViewModel @Inject constructor(
                 vodRepository.getSeriesGenres(),
                 sourceRepository.getAllSources(),
                 watchHistoryRepository.getRecentEpisodes(10)
-            ) { series, genres, sources, continueWatching ->
-                CombinedData(series, genres, sources, continueWatching.filter { !it.isCompleted })
+            ) { series, genres, sources, recentlyWatched ->
+                CombinedData(series, genres, sources, recentlyWatched)
             }.collect { data ->
+                val genreList = mutableListOf("All")
+                if (data.recentlyWatched.isNotEmpty()) {
+                    genreList.add("History")
+                }
+                genreList.addAll(data.genres)
+
                 _uiState.value = _uiState.value.copy(
                     series = data.series,
-                    genres = listOf("All") + data.genres,
+                    genres = genreList,
                     sources = data.sources,
-                    continueWatching = data.continueWatching,
+                    recentlyWatched = data.recentlyWatched,
                     isLoading = false
                 )
                 applyFilters()
@@ -81,15 +87,23 @@ class SeriesViewModel @Inject constructor(
         val series: List<Series>,
         val genres: List<String>,
         val sources: List<Source>,
-        val continueWatching: List<WatchHistoryEntity>
+        val recentlyWatched: List<WatchHistoryEntity>
     )
 
     private fun applyFilters() {
         val state = _uiState.value
-        var filtered = state.series
+        var filtered: List<Series>
 
-        if (state.selectedGenre != null) {
-            filtered = filtered.filter { it.genre == state.selectedGenre }
+        // Handle History filter specially - show series with recently watched episodes
+        if (state.selectedGenre == "History") {
+            val historySeriesIds = state.recentlyWatched.mapNotNull { it.seriesId }.distinct()
+            filtered = historySeriesIds.mapNotNull { id -> state.series.find { it.id == id } }
+        } else {
+            filtered = state.series
+
+            if (state.selectedGenre != null) {
+                filtered = filtered.filter { it.genre == state.selectedGenre }
+            }
         }
 
         if (state.showFavoritesOnly) {
@@ -102,14 +116,16 @@ class SeriesViewModel @Inject constructor(
             }
         }
 
-        // Apply sorting
-        filtered = when (state.sortOption) {
-            SeriesSortOption.NAME_ASC -> filtered.sortedBy { it.name.lowercase() }
-            SeriesSortOption.NAME_DESC -> filtered.sortedByDescending { it.name.lowercase() }
-            SeriesSortOption.YEAR_DESC -> filtered.sortedByDescending { it.year ?: "0" }
-            SeriesSortOption.YEAR_ASC -> filtered.sortedBy { it.year ?: "9999" }
-            SeriesSortOption.RATING_DESC -> filtered.sortedByDescending { it.rating?.toDoubleOrNull() ?: 0.0 }
-            SeriesSortOption.RATING_ASC -> filtered.sortedBy { it.rating?.toDoubleOrNull() ?: 0.0 }
+        // Apply sorting (skip for History to preserve watch order)
+        if (state.selectedGenre != "History") {
+            filtered = when (state.sortOption) {
+                SeriesSortOption.NAME_ASC -> filtered.sortedBy { it.name.lowercase() }
+                SeriesSortOption.NAME_DESC -> filtered.sortedByDescending { it.name.lowercase() }
+                SeriesSortOption.YEAR_DESC -> filtered.sortedByDescending { it.year ?: "0" }
+                SeriesSortOption.YEAR_ASC -> filtered.sortedBy { it.year ?: "9999" }
+                SeriesSortOption.RATING_DESC -> filtered.sortedByDescending { it.rating?.toDoubleOrNull() ?: 0.0 }
+                SeriesSortOption.RATING_ASC -> filtered.sortedBy { it.rating?.toDoubleOrNull() ?: 0.0 }
+            }
         }
 
         _uiState.value = _uiState.value.copy(filteredSeries = filtered)

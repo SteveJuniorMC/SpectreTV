@@ -15,10 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -44,7 +42,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -69,14 +66,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.spectretv.app.data.local.entity.WatchHistoryEntity
 import com.spectretv.app.domain.model.Movie
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoviesScreen(
     onMovieClick: (Movie) -> Unit,
-    onContinueWatchingClick: (WatchHistoryEntity) -> Unit = {},
     viewModel: MoviesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -194,31 +189,6 @@ fun MoviesScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Continue Watching section
-            if (uiState.continueWatching.isNotEmpty()) {
-                Column(modifier = Modifier.padding(top = 8.dp)) {
-                    Text(
-                        text = "Continue Watching",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(
-                            items = uiState.continueWatching,
-                            key = { it.contentId }
-                        ) { historyItem ->
-                            ContinueWatchingCard(
-                                historyItem = historyItem,
-                                onClick = { onContinueWatchingClick(historyItem) }
-                            )
-                        }
-                    }
-                }
-            }
-
             // Genre chips
             if (uiState.genres.isNotEmpty()) {
                 LazyRow(
@@ -266,68 +236,6 @@ fun MoviesScreen(
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ContinueWatchingCard(
-    historyItem: WatchHistoryEntity,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .width(140.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                    .background(MaterialTheme.colorScheme.surface),
-                contentAlignment = Alignment.Center
-            ) {
-                if (historyItem.posterUrl != null) {
-                    AsyncImage(
-                        model = historyItem.posterUrl,
-                        contentDescription = historyItem.name,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Movie,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    )
-                }
-            }
-
-            // Progress bar
-            LinearProgressIndicator(
-                progress = historyItem.progressPercent,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surface
-            )
-
-            Column(modifier = Modifier.padding(8.dp)) {
-                Text(
-                    text = historyItem.name,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
         }
     }

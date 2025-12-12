@@ -37,7 +37,7 @@ data class MoviesUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val sources: List<Source> = emptyList(),
-    val continueWatching: List<WatchHistoryEntity> = emptyList()
+    val recentlyWatched: List<WatchHistoryEntity> = emptyList()
 )
 
 @HiltViewModel
@@ -61,14 +61,20 @@ class MoviesViewModel @Inject constructor(
                 vodRepository.getMovieGenres(),
                 sourceRepository.getAllSources(),
                 watchHistoryRepository.getRecentMovies(10)
-            ) { movies, genres, sources, continueWatching ->
-                CombinedData(movies, genres, sources, continueWatching.filter { !it.isCompleted })
+            ) { movies, genres, sources, recentlyWatched ->
+                CombinedData(movies, genres, sources, recentlyWatched)
             }.collect { data ->
+                val genreList = mutableListOf("All")
+                if (data.recentlyWatched.isNotEmpty()) {
+                    genreList.add("History")
+                }
+                genreList.addAll(data.genres)
+
                 _uiState.value = _uiState.value.copy(
                     movies = data.movies,
-                    genres = listOf("All") + data.genres,
+                    genres = genreList,
                     sources = data.sources,
-                    continueWatching = data.continueWatching,
+                    recentlyWatched = data.recentlyWatched,
                     isLoading = false
                 )
                 applyFilters()
@@ -80,15 +86,23 @@ class MoviesViewModel @Inject constructor(
         val movies: List<Movie>,
         val genres: List<String>,
         val sources: List<Source>,
-        val continueWatching: List<WatchHistoryEntity>
+        val recentlyWatched: List<WatchHistoryEntity>
     )
 
     private fun applyFilters() {
         val state = _uiState.value
-        var filtered = state.movies
+        var filtered: List<Movie>
 
-        if (state.selectedGenre != null) {
-            filtered = filtered.filter { it.genre == state.selectedGenre }
+        // Handle History filter specially
+        if (state.selectedGenre == "History") {
+            val historyIds = state.recentlyWatched.map { it.contentId }
+            filtered = historyIds.mapNotNull { id -> state.movies.find { it.id == id } }
+        } else {
+            filtered = state.movies
+
+            if (state.selectedGenre != null) {
+                filtered = filtered.filter { it.genre == state.selectedGenre }
+            }
         }
 
         if (state.showFavoritesOnly) {
@@ -101,14 +115,16 @@ class MoviesViewModel @Inject constructor(
             }
         }
 
-        // Apply sorting
-        filtered = when (state.sortOption) {
-            SortOption.NAME_ASC -> filtered.sortedBy { it.name.lowercase() }
-            SortOption.NAME_DESC -> filtered.sortedByDescending { it.name.lowercase() }
-            SortOption.YEAR_DESC -> filtered.sortedByDescending { it.year ?: "0" }
-            SortOption.YEAR_ASC -> filtered.sortedBy { it.year ?: "9999" }
-            SortOption.RATING_DESC -> filtered.sortedByDescending { it.rating?.toDoubleOrNull() ?: 0.0 }
-            SortOption.RATING_ASC -> filtered.sortedBy { it.rating?.toDoubleOrNull() ?: 0.0 }
+        // Apply sorting (skip for History to preserve watch order)
+        if (state.selectedGenre != "History") {
+            filtered = when (state.sortOption) {
+                SortOption.NAME_ASC -> filtered.sortedBy { it.name.lowercase() }
+                SortOption.NAME_DESC -> filtered.sortedByDescending { it.name.lowercase() }
+                SortOption.YEAR_DESC -> filtered.sortedByDescending { it.year ?: "0" }
+                SortOption.YEAR_ASC -> filtered.sortedBy { it.year ?: "9999" }
+                SortOption.RATING_DESC -> filtered.sortedByDescending { it.rating?.toDoubleOrNull() ?: 0.0 }
+                SortOption.RATING_ASC -> filtered.sortedBy { it.rating?.toDoubleOrNull() ?: 0.0 }
+            }
         }
 
         _uiState.value = _uiState.value.copy(filteredMovies = filtered)

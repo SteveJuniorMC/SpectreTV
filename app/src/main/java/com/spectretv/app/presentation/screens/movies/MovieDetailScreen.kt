@@ -142,25 +142,28 @@ private fun MovieDetailContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Backdrop/Poster
+        // Poster with portrait aspect ratio
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 9f)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
         ) {
-            val imageUrl = movie.backdropUrl ?: movie.posterUrl
+            val imageUrl = movie.posterUrl ?: movie.backdropUrl
             if (imageUrl != null) {
                 AsyncImage(
                     model = imageUrl,
                     contentDescription = movie.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .aspectRatio(2f / 3f),
+                    contentScale = ContentScale.Fit
                 )
             } else {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .fillMaxWidth(0.6f)
+                        .aspectRatio(2f / 3f),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -168,37 +171,6 @@ private fun MovieDetailContent(
                         contentDescription = null,
                         modifier = Modifier.size(80.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    )
-                }
-            }
-
-            // Gradient overlay
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
-                            startY = 100f
-                        )
-                    )
-            )
-
-            // Play button
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center
-            ) {
-                IconButton(onClick = onPlayClick) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Play",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(40.dp)
                     )
                 }
             }

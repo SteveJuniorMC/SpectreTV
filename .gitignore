@@ -26,3 +26,4 @@ captures/
 .externalNativeBuild/
 .cxx/
 gradle-8.4-bin.zip
+*.jks

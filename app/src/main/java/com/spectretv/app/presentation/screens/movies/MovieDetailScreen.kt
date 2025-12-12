@@ -25,11 +25,14 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -54,6 +57,7 @@ import com.spectretv.app.domain.model.Movie
 fun MovieDetailScreen(
     onBackClick: () -> Unit,
     onPlayClick: (Movie) -> Unit,
+    onResumeClick: (Movie, Long) -> Unit,
     viewModel: MovieDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -97,6 +101,9 @@ fun MovieDetailScreen(
                 MovieDetailContent(
                     movie = uiState.movie!!,
                     onPlayClick = { onPlayClick(uiState.movie!!) },
+                    onResumeClick = { uiState.resumePosition?.let { pos -> onResumeClick(uiState.movie!!, pos) } },
+                    resumePosition = uiState.resumePosition,
+                    progressPercent = uiState.progressPercent,
                     modifier = Modifier.padding(paddingValues)
                 )
             }
@@ -116,6 +123,9 @@ fun MovieDetailScreen(
 private fun MovieDetailContent(
     movie: Movie,
     onPlayClick: () -> Unit,
+    onResumeClick: () -> Unit,
+    resumePosition: Long?,
+    progressPercent: Float,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -246,15 +256,56 @@ private fun MovieDetailContent(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Play button
-            Button(
-                onClick = onPlayClick,
+            // Progress bar (if resumable)
+            if (resumePosition != null) {
+                LinearProgressIndicator(
+                    progress = progressPercent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Play/Resume buttons
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Play")
+                if (resumePosition != null) {
+                    // Resume button (primary)
+                    Button(
+                        onClick = onResumeClick,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Resume")
+                    }
+                    // Play from start button (secondary)
+                    OutlinedButton(
+                        onClick = onPlayClick,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Play from Start")
+                    }
+                } else {
+                    // Just play button
+                    Button(
+                        onClick = onPlayClick,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Play")
+                    }
+                }
             }
 
             // Plot

@@ -56,7 +56,7 @@ class LiveViewModel @Inject constructor(
             }.collect { data ->
                 val groupList = mutableListOf("All")
                 if (data.recentlyWatched.isNotEmpty()) {
-                    groupList.add("History")
+                    groupList.add("Recent")
                 }
                 groupList.addAll(data.groups)
 
@@ -83,8 +83,8 @@ class LiveViewModel @Inject constructor(
         val state = _uiState.value
         var filtered: List<Channel>
 
-        // Handle History filter specially
-        if (state.selectedGroup == "History") {
+        // Handle Recent filter specially
+        if (state.selectedGroup == "Recent") {
             val historyIds = state.recentlyWatched.map { it.contentId }
             filtered = historyIds.mapNotNull { id -> state.channels.find { it.id == id } }
         } else {

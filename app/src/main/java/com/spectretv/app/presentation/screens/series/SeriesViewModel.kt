@@ -67,7 +67,7 @@ class SeriesViewModel @Inject constructor(
             }.collect { data ->
                 val genreList = mutableListOf("All")
                 if (data.recentlyWatched.isNotEmpty()) {
-                    genreList.add("History")
+                    genreList.add("Recent")
                 }
                 genreList.addAll(data.genres)
 
@@ -94,8 +94,8 @@ class SeriesViewModel @Inject constructor(
         val state = _uiState.value
         var filtered: List<Series>
 
-        // Handle History filter specially - show series with recently watched episodes
-        if (state.selectedGenre == "History") {
+        // Handle Recent filter specially - show series with recently watched episodes
+        if (state.selectedGenre == "Recent") {
             val historySeriesIds = state.recentlyWatched.mapNotNull { it.seriesId }.distinct()
             filtered = historySeriesIds.mapNotNull { id -> state.series.find { it.id == id } }
         } else {
@@ -116,8 +116,8 @@ class SeriesViewModel @Inject constructor(
             }
         }
 
-        // Apply sorting (skip for History to preserve watch order)
-        if (state.selectedGenre != "History") {
+        // Apply sorting (skip for Recent to preserve watch order)
+        if (state.selectedGenre != "Recent") {
             filtered = when (state.sortOption) {
                 SeriesSortOption.NAME_ASC -> filtered.sortedBy { it.name.lowercase() }
                 SeriesSortOption.NAME_DESC -> filtered.sortedByDescending { it.name.lowercase() }

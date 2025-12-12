@@ -115,7 +115,8 @@ class PlayerManager @Inject constructor(
         seriesId: String? = null,
         seriesName: String? = null,
         seasonNumber: Int? = null,
-        episodeNumber: Int? = null
+        episodeNumber: Int? = null,
+        startPosition: Long? = null // null = auto-resume, 0 = start from beginning, positive = specific position
     ) {
         // Save progress of current stream before switching
         if (currentStream?.url != url) {
@@ -170,13 +171,25 @@ class PlayerManager @Inject constructor(
             play()
         }
 
-        // Resume from saved position for VOD content
+        // Handle seeking for VOD content
         if (contentType == ContentType.VOD && contentId != null) {
-            scope.launch {
-                val savedPosition = watchHistoryRepository.getByContentId(contentId)?.positionMs ?: 0L
-                if (savedPosition > 0) {
-                    kotlinx.coroutines.withContext(Dispatchers.Main) {
-                        _exoPlayer?.seekTo(savedPosition)
+            when {
+                startPosition != null -> {
+                    // Explicit position provided (0 = start from beginning, positive = specific position)
+                    if (startPosition > 0) {
+                        _exoPlayer?.seekTo(startPosition)
+                    }
+                    // startPosition == 0 means play from start, no seek needed
+                }
+                else -> {
+                    // Auto-resume from saved position
+                    scope.launch {
+                        val savedPosition = watchHistoryRepository.getByContentId(contentId)?.position ?: 0L
+                        if (savedPosition > 0) {
+                            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                _exoPlayer?.seekTo(savedPosition)
+                            }
+                        }
                     }
                 }
             }

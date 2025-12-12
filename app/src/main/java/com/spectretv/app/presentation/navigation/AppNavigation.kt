@@ -153,7 +153,18 @@ fun AppNavigation(playerManager: PlayerManager) {
                                 title = movie.name,
                                 contentType = ContentType.VOD,
                                 contentId = movie.id,
-                                posterUrl = movie.posterUrl
+                                posterUrl = movie.posterUrl,
+                                startPosition = 0L // Play from start
+                            )
+                        },
+                        onResumeClick = { movie, position ->
+                            playerManager.play(
+                                url = movie.streamUrl,
+                                title = movie.name,
+                                contentType = ContentType.VOD,
+                                contentId = movie.id,
+                                posterUrl = movie.posterUrl,
+                                startPosition = position // Resume from position
                             )
                         }
                     )

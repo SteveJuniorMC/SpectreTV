@@ -215,7 +215,14 @@ fun AppNavigation(playerManager: PlayerManager) {
                 exoPlayer = playerManager.exoPlayer,
                 isPlaying = isPlaying,
                 contentType = currentStream.contentType,
-                onMinimize = { playerManager.minimize() },
+                onMinimize = {
+                    // VOD content (movies/series) stops, live TV minimizes to mini player
+                    if (currentStream.contentType == ContentType.VOD) {
+                        playerManager.stop()
+                    } else {
+                        playerManager.minimize()
+                    }
+                },
                 onPlayPause = { playerManager.togglePlayPause() },
                 onSeekTo = { playerManager.seekTo(it) },
                 onSkipForward = { playerManager.skipForward() },

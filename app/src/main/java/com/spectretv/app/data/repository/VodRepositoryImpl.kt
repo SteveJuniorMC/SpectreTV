@@ -113,8 +113,8 @@ class VodRepositoryImpl @Inject constructor(
                 .map { it.id }
                 .toSet()
 
-            // Delete old movies
-            movieDao.deleteMoviesBySource(source.id)
+            // Collect all movies in memory first (don't insert until done)
+            val allEntities = mutableListOf<MovieEntity>()
 
             // Fetch by category
             categories.forEachIndexed { index, category ->
@@ -134,9 +134,19 @@ class VodRepositoryImpl @Inject constructor(
                         movie.copy(isFavorite = existingFavorites.contains(movie.id))
                     )
                 }
-                movieDao.insertMovies(entities)
+                allEntities.addAll(entities)
                 itemsLoaded += movies.size
             }
+
+            // Now save all at once
+            onProgress(LoadingProgress(
+                currentCategory = "Saving...",
+                categoriesLoaded = totalCategories,
+                totalCategories = totalCategories,
+                itemsLoaded = itemsLoaded
+            ))
+            movieDao.deleteMoviesBySource(source.id)
+            movieDao.insertMovies(allEntities)
 
             onProgress(LoadingProgress(
                 currentCategory = "Done",
@@ -278,9 +288,8 @@ class VodRepositoryImpl @Inject constructor(
                 .map { it.id }
                 .toSet()
 
-            // Delete old series and episodes
-            episodeDao.deleteEpisodesBySource(source.id)
-            seriesDao.deleteSeriesBySource(source.id)
+            // Collect all series in memory first (don't insert until done)
+            val allEntities = mutableListOf<SeriesEntity>()
 
             // Fetch by category
             categories.forEachIndexed { index, category ->
@@ -300,9 +309,20 @@ class VodRepositoryImpl @Inject constructor(
                         series.copy(isFavorite = existingFavorites.contains(series.id))
                     )
                 }
-                seriesDao.insertSeries(entities)
+                allEntities.addAll(entities)
                 itemsLoaded += seriesList.size
             }
+
+            // Now save all at once
+            onProgress(LoadingProgress(
+                currentCategory = "Saving...",
+                categoriesLoaded = totalCategories,
+                totalCategories = totalCategories,
+                itemsLoaded = itemsLoaded
+            ))
+            episodeDao.deleteEpisodesBySource(source.id)
+            seriesDao.deleteSeriesBySource(source.id)
+            seriesDao.insertSeries(allEntities)
 
             onProgress(LoadingProgress(
                 currentCategory = "Done",

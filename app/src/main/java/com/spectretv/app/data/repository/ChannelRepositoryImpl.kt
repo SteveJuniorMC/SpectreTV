@@ -143,8 +143,8 @@ class ChannelRepositoryImpl @Inject constructor(
                         .map { it.id }
                         .toSet()
 
-                    // Delete old channels
-                    channelDao.deleteChannelsBySource(source.id)
+                    // Collect all channels in memory first (don't insert until done)
+                    val allEntities = mutableListOf<ChannelEntity>()
 
                     // Fetch by category
                     categories.forEachIndexed { index, category ->
@@ -164,9 +164,19 @@ class ChannelRepositoryImpl @Inject constructor(
                                 channel.copy(isFavorite = existingFavorites.contains(channel.id))
                             )
                         }
-                        channelDao.insertChannels(entities)
+                        allEntities.addAll(entities)
                         itemsLoaded += channels.size
                     }
+
+                    // Now save all at once
+                    onProgress(LoadingProgress(
+                        currentCategory = "Saving...",
+                        categoriesLoaded = totalCategories,
+                        totalCategories = totalCategories,
+                        itemsLoaded = itemsLoaded
+                    ))
+                    channelDao.deleteChannelsBySource(source.id)
+                    channelDao.insertChannels(allEntities)
 
                     onProgress(LoadingProgress(
                         currentCategory = "Done",

@@ -54,9 +54,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import kotlinx.coroutines.flow.drop
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -94,9 +96,13 @@ fun LiveScreen(
         }
     }
 
-    // Reset scroll when search or category changes
-    LaunchedEffect(uiState.searchQuery, uiState.selectedGroup) {
-        listState.scrollToItem(0)
+    // Reset scroll when search or category changes (but not on recomposition from navigation)
+    LaunchedEffect(Unit) {
+        snapshotFlow { Pair(uiState.searchQuery, uiState.selectedGroup) }
+            .drop(1) // Skip initial emission to avoid reset on navigation back
+            .collect {
+                listState.scrollToItem(0)
+            }
     }
 
     LaunchedEffect(uiState.error) {

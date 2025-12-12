@@ -58,9 +58,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import kotlinx.coroutines.flow.drop
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -99,9 +101,13 @@ fun SeriesScreen(
         }
     }
 
-    // Reset scroll when search, genre, or sort changes
-    LaunchedEffect(uiState.searchQuery, uiState.selectedGenre, uiState.sortOption) {
-        gridState.scrollToItem(0)
+    // Reset scroll when search, genre, or sort changes (but not on recomposition from navigation)
+    LaunchedEffect(Unit) {
+        snapshotFlow { Triple(uiState.searchQuery, uiState.selectedGenre, uiState.sortOption) }
+            .drop(1) // Skip initial emission to avoid reset on navigation back
+            .collect {
+                gridState.scrollToItem(0)
+            }
     }
 
     LaunchedEffect(uiState.error) {

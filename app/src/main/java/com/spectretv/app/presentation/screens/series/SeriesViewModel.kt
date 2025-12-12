@@ -37,7 +37,6 @@ data class SeriesUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val sources: List<Source> = emptyList(),
-    val debugInfo: String? = null,
     val recentlyWatched: List<WatchHistoryEntity> = emptyList()
 )
 
@@ -156,31 +155,17 @@ class SeriesViewModel @Inject constructor(
 
     fun refreshSeries() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null, debugInfo = null)
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
                 val sources = sourceRepository.getActiveSources().first()
-                val debugLines = mutableListOf<String>()
-                debugLines.add("Active sources: ${sources.size}")
-
                 sources.forEach { source ->
-                    debugLines.add("--- ${source.name} ---")
-                    val debug = vodRepository.refreshSeriesWithDebug(source)
-                    debugLines.add(debug)
+                    vodRepository.refreshSeries(source)
                 }
-
-                // Get the updated series count
-                val seriesCount = vodRepository.getAllSeries().first().size
-                debugLines.add("--- Total in DB: $seriesCount ---")
-
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    debugInfo = debugLines.joinToString("\n")
-                )
+                _uiState.value = _uiState.value.copy(isLoading = false)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = e.message ?: "Failed to refresh series",
-                    debugInfo = "Error: ${e.message}"
+                    error = e.message ?: "Failed to refresh series"
                 )
             }
         }

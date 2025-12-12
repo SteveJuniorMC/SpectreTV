@@ -73,9 +73,11 @@ class PlayerManager @Inject constructor(
         val contentId = stream.contentId ?: return
         val player = _exoPlayer ?: return
 
+        // Get values on main thread before launching coroutine
+        val position = player.currentPosition
+        val duration = player.duration.takeIf { it > 0 } ?: 0L
+
         scope.launch {
-            val position = player.currentPosition
-            val duration = player.duration.takeIf { it > 0 } ?: 0L
             watchHistoryRepository.updateProgress(contentId, position, duration)
         }
     }
@@ -173,7 +175,9 @@ class PlayerManager @Inject constructor(
             scope.launch {
                 val savedPosition = watchHistoryRepository.getByContentId(contentId)?.positionMs ?: 0L
                 if (savedPosition > 0) {
-                    _exoPlayer?.seekTo(savedPosition)
+                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        _exoPlayer?.seekTo(savedPosition)
+                    }
                 }
             }
         }

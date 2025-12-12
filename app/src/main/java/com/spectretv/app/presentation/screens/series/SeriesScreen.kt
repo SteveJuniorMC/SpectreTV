@@ -496,7 +496,7 @@ private fun ContinueWatchingEpisodeCard(
 
             // Progress bar
             LinearProgressIndicator(
-                progress = { historyItem.progressPercent },
+                progress = historyItem.progressPercent,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(3.dp),

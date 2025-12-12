@@ -313,7 +313,7 @@ private fun ContinueWatchingCard(
 
             // Progress bar
             LinearProgressIndicator(
-                progress = { historyItem.progressPercent },
+                progress = historyItem.progressPercent,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(3.dp),

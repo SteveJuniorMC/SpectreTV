@@ -166,7 +166,8 @@ fun AppNavigation(playerManager: PlayerManager) {
                                 posterUrl = movie.posterUrl,
                                 startPosition = position // Resume from position
                             )
-                        }
+                        },
+                        isPlayerFullScreen = isFullScreen
                     )
                 }
 

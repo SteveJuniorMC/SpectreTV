@@ -26,11 +26,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -67,6 +70,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.C
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
@@ -188,6 +192,7 @@ fun FullScreenPlayer(
     onSeekTo: (Long) -> Unit = {},
     onSkipForward: () -> Unit = {},
     onSkipBackward: () -> Unit = {},
+    onRetry: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -213,6 +218,9 @@ fun FullScreenPlayer(
     var aspectRatioMode by remember { mutableStateOf(AspectRatioMode.FIT) }
     var showAspectRatioMenu by remember { mutableStateOf(false) }
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
+
+    // Error state
+    var playbackError by remember(title) { mutableStateOf<String?>(null) }
 
     val isVod = contentType == ContentType.VOD
 
@@ -290,6 +298,10 @@ fun FullScreenPlayer(
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 isBuffering = playbackState == Player.STATE_BUFFERING
+                // Clear error when playback starts successfully
+                if (playbackState == Player.STATE_READY) {
+                    playbackError = null
+                }
             }
 
             override fun onTracksChanged(tracks: Tracks) {
@@ -297,6 +309,34 @@ fun FullScreenPlayer(
                     selectedAudioIndex = audioIdx
                     selectedSubtitleIndex = subIdx
                 }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                val errorMessage = when (error.errorCode) {
+                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ->
+                        "Network connection failed"
+                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
+                        "Connection timed out"
+                    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
+                        "Server error (HTTP ${error.cause?.message ?: "error"})"
+                    PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
+                        "Stream not found"
+                    PlaybackException.ERROR_CODE_IO_NO_PERMISSION ->
+                        "Access denied"
+                    PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+                    PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED ->
+                        "Invalid stream format"
+                    PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ->
+                        "Decoder initialization failed"
+                    PlaybackException.ERROR_CODE_DECODING_FAILED ->
+                        "Decoding error"
+                    PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED ->
+                        "Audio initialization failed"
+                    else ->
+                        error.message ?: "Playback error"
+                }
+                playbackError = errorMessage
+                isBuffering = false
             }
         }
         exoPlayer?.addListener(listener)
@@ -382,7 +422,7 @@ fun FullScreenPlayer(
         }
 
         // Buffering indicator
-        if (isBuffering) {
+        if (isBuffering && playbackError == null) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -391,6 +431,57 @@ fun FullScreenPlayer(
                     color = Color.White,
                     modifier = Modifier.size(48.dp)
                 )
+            }
+        }
+
+        // Error display
+        if (playbackError != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.8f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Error,
+                        contentDescription = "Error",
+                        tint = Color.Red,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Playback Error",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = playbackError!!,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = {
+                            playbackError = null
+                            isBuffering = true
+                            onRetry()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Retry")
+                    }
+                }
             }
         }
 

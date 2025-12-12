@@ -229,6 +229,17 @@ class PlayerManager @Inject constructor(
         isFullScreen = true
     }
 
+    fun retry() {
+        currentStream?.let { stream ->
+            _exoPlayer?.apply {
+                stop()
+                setMediaItem(MediaItem.fromUri(stream.url))
+                prepare()
+                play()
+            }
+        }
+    }
+
     fun stop() {
         // Save progress synchronously to ensure it's written before UI updates
         val stream = currentStream

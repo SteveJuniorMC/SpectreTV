@@ -227,7 +227,8 @@ fun AppNavigation(playerManager: PlayerManager) {
                 onPlayPause = { playerManager.togglePlayPause() },
                 onSeekTo = { playerManager.seekTo(it) },
                 onSkipForward = { playerManager.skipForward() },
-                onSkipBackward = { playerManager.skipBackward() }
+                onSkipBackward = { playerManager.skipBackward() },
+                onRetry = { playerManager.retry() }
             )
         }
     }

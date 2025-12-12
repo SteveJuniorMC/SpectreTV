@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -229,7 +230,20 @@ class PlayerManager @Inject constructor(
     }
 
     fun stop() {
-        saveCurrentProgress()
+        // Save progress synchronously to ensure it's written before UI updates
+        val stream = currentStream
+        val contentId = stream?.contentId
+        val player = _exoPlayer
+
+        if (stream != null && contentId != null && player != null) {
+            val position = player.currentPosition
+            val duration = player.duration.takeIf { it > 0 } ?: 0L
+
+            runBlocking(Dispatchers.IO) {
+                watchHistoryRepository.updateProgress(contentId, position, duration)
+            }
+        }
+
         _exoPlayer?.stop()
         currentStream = null
         isFullScreen = false

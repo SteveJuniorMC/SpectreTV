@@ -184,7 +184,7 @@ class PlayerManager @Inject constructor(
                 else -> {
                     // Auto-resume from saved position
                     scope.launch {
-                        val savedPosition = watchHistoryRepository.getByContentId(contentId)?.position ?: 0L
+                        val savedPosition = watchHistoryRepository.getByContentId(contentId)?.positionMs ?: 0L
                         if (savedPosition > 0) {
                             kotlinx.coroutines.withContext(Dispatchers.Main) {
                                 _exoPlayer?.seekTo(savedPosition)

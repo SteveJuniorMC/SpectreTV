@@ -58,12 +58,12 @@ class MovieDetailViewModel @Inject constructor(
     private fun loadWatchHistory() {
         viewModelScope.launch {
             val history = watchHistoryRepository.getByContentId(movieId)
-            if (history != null && history.position > 0 && history.duration > 0) {
-                val progress = history.position.toFloat() / history.duration.toFloat()
+            if (history != null && history.positionMs > 0 && history.durationMs > 0) {
+                val progress = history.positionMs.toFloat() / history.durationMs.toFloat()
                 // Only show resume if not near the end (< 95%)
                 if (progress < 0.95f) {
                     _uiState.value = _uiState.value.copy(
-                        resumePosition = history.position,
+                        resumePosition = history.positionMs,
                         progressPercent = progress
                     )
                 }

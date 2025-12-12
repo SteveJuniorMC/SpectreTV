@@ -2,10 +2,12 @@ package com.spectretv.app.presentation.screens.series
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.spectretv.app.data.local.entity.WatchHistoryEntity
 import com.spectretv.app.domain.model.Series
 import com.spectretv.app.domain.model.Source
 import com.spectretv.app.domain.repository.SourceRepository
 import com.spectretv.app.domain.repository.VodRepository
+import com.spectretv.app.domain.repository.WatchHistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,13 +37,15 @@ data class SeriesUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val sources: List<Source> = emptyList(),
-    val debugInfo: String? = null
+    val debugInfo: String? = null,
+    val continueWatching: List<WatchHistoryEntity> = emptyList()
 )
 
 @HiltViewModel
 class SeriesViewModel @Inject constructor(
     private val vodRepository: VodRepository,
-    private val sourceRepository: SourceRepository
+    private val sourceRepository: SourceRepository,
+    private val watchHistoryRepository: WatchHistoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SeriesUiState())
@@ -56,20 +60,29 @@ class SeriesViewModel @Inject constructor(
             combine(
                 vodRepository.getAllSeries(),
                 vodRepository.getSeriesGenres(),
-                sourceRepository.getAllSources()
-            ) { series, genres, sources ->
-                Triple(series, genres, sources)
-            }.collect { (series, genres, sources) ->
+                sourceRepository.getAllSources(),
+                watchHistoryRepository.getRecentEpisodes(10)
+            ) { series, genres, sources, continueWatching ->
+                CombinedData(series, genres, sources, continueWatching.filter { !it.isCompleted })
+            }.collect { data ->
                 _uiState.value = _uiState.value.copy(
-                    series = series,
-                    genres = listOf("All") + genres,
-                    sources = sources,
+                    series = data.series,
+                    genres = listOf("All") + data.genres,
+                    sources = data.sources,
+                    continueWatching = data.continueWatching,
                     isLoading = false
                 )
                 applyFilters()
             }
         }
     }
+
+    private data class CombinedData(
+        val series: List<Series>,
+        val genres: List<String>,
+        val sources: List<Source>,
+        val continueWatching: List<WatchHistoryEntity>
+    )
 
     private fun applyFilters() {
         val state = _uiState.value

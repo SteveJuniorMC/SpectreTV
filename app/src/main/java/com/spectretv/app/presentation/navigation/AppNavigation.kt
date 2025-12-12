@@ -127,6 +127,15 @@ fun AppNavigation(playerManager: PlayerManager) {
                                 contentId = channel.id,
                                 posterUrl = channel.logoUrl
                             )
+                        },
+                        onRecentlyWatchedClick = { historyItem ->
+                            playerManager.play(
+                                url = historyItem.streamUrl,
+                                title = historyItem.name,
+                                contentType = ContentType.LIVE,
+                                contentId = historyItem.contentId,
+                                posterUrl = historyItem.posterUrl
+                            )
                         }
                     )
                 }
@@ -135,6 +144,15 @@ fun AppNavigation(playerManager: PlayerManager) {
                     MoviesScreen(
                         onMovieClick = { movie ->
                             navController.navigate(Screen.MovieDetail.createRoute(movie.id))
+                        },
+                        onContinueWatchingClick = { historyItem ->
+                            playerManager.play(
+                                url = historyItem.streamUrl,
+                                title = historyItem.name,
+                                contentType = ContentType.VOD,
+                                contentId = historyItem.contentId,
+                                posterUrl = historyItem.posterUrl
+                            )
                         }
                     )
                 }
@@ -163,6 +181,19 @@ fun AppNavigation(playerManager: PlayerManager) {
                     SeriesScreen(
                         onSeriesClick = { series ->
                             navController.navigate(Screen.SeriesDetail.createRoute(series.id))
+                        },
+                        onContinueWatchingClick = { historyItem ->
+                            playerManager.play(
+                                url = historyItem.streamUrl,
+                                title = historyItem.name,
+                                contentType = ContentType.VOD,
+                                contentId = historyItem.contentId,
+                                posterUrl = historyItem.posterUrl,
+                                seriesId = historyItem.seriesId,
+                                seriesName = historyItem.seriesName,
+                                seasonNumber = historyItem.seasonNumber,
+                                episodeNumber = historyItem.episodeNumber
+                            )
                         }
                     )
                 }

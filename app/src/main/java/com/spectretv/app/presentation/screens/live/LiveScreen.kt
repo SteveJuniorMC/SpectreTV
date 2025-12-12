@@ -61,12 +61,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.spectretv.app.data.local.entity.WatchHistoryEntity
 import com.spectretv.app.domain.model.Channel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveScreen(
     onChannelClick: (Channel) -> Unit,
+    onRecentlyWatchedClick: (WatchHistoryEntity) -> Unit = {},
     viewModel: LiveViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -153,6 +155,31 @@ fun LiveScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Recently Watched section
+            if (uiState.recentlyWatched.isNotEmpty()) {
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    Text(
+                        text = "Recently Watched",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(
+                            items = uiState.recentlyWatched,
+                            key = { it.contentId }
+                        ) { historyItem ->
+                            RecentlyWatchedChannelCard(
+                                historyItem = historyItem,
+                                onClick = { onRecentlyWatchedClick(historyItem) }
+                            )
+                        }
+                    }
+                }
+            }
+
             // Category chips
             if (uiState.groups.isNotEmpty()) {
                 LazyRow(
@@ -331,6 +358,59 @@ private fun EmptyState(
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecentlyWatchedChannelCard(
+    historyItem: WatchHistoryEntity,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .width(100.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface),
+                contentAlignment = Alignment.Center
+            ) {
+                if (historyItem.posterUrl != null) {
+                    AsyncImage(
+                        model = historyItem.posterUrl,
+                        contentDescription = historyItem.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Tv,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = historyItem.name,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }

@@ -167,6 +167,16 @@ class PlayerManager @Inject constructor(
             prepare()
             play()
         }
+
+        // Resume from saved position for VOD content
+        if (contentType == ContentType.VOD && contentId != null) {
+            scope.launch {
+                val savedPosition = watchHistoryRepository.getByContentId(contentId)?.positionMs ?: 0L
+                if (savedPosition > 0) {
+                    _exoPlayer?.seekTo(savedPosition)
+                }
+            }
+        }
     }
 
     fun togglePlayPause() {

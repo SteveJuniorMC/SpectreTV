@@ -2,10 +2,12 @@ package com.spectretv.app.presentation.screens.live
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.spectretv.app.data.local.entity.WatchHistoryEntity
 import com.spectretv.app.domain.model.Channel
 import com.spectretv.app.domain.model.Source
 import com.spectretv.app.domain.repository.ChannelRepository
 import com.spectretv.app.domain.repository.SourceRepository
+import com.spectretv.app.domain.repository.WatchHistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,13 +26,15 @@ data class LiveUiState(
     val showFavoritesOnly: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val sources: List<Source> = emptyList()
+    val sources: List<Source> = emptyList(),
+    val recentlyWatched: List<WatchHistoryEntity> = emptyList()
 )
 
 @HiltViewModel
 class LiveViewModel @Inject constructor(
     private val channelRepository: ChannelRepository,
-    private val sourceRepository: SourceRepository
+    private val sourceRepository: SourceRepository,
+    private val watchHistoryRepository: WatchHistoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LiveUiState())
@@ -45,20 +49,29 @@ class LiveViewModel @Inject constructor(
             combine(
                 channelRepository.getAllChannels(),
                 channelRepository.getAllGroups(),
-                sourceRepository.getAllSources()
-            ) { channels, groups, sources ->
-                Triple(channels, groups, sources)
-            }.collect { (channels, groups, sources) ->
+                sourceRepository.getAllSources(),
+                watchHistoryRepository.getRecentChannels(10)
+            ) { channels, groups, sources, recentlyWatched ->
+                CombinedData(channels, groups, sources, recentlyWatched)
+            }.collect { data ->
                 _uiState.value = _uiState.value.copy(
-                    channels = channels,
-                    groups = listOf("All") + groups,
-                    sources = sources,
+                    channels = data.channels,
+                    groups = listOf("All") + data.groups,
+                    sources = data.sources,
+                    recentlyWatched = data.recentlyWatched,
                     isLoading = false
                 )
                 applyFilters()
             }
         }
     }
+
+    private data class CombinedData(
+        val channels: List<Channel>,
+        val groups: List<String>,
+        val sources: List<Source>,
+        val recentlyWatched: List<WatchHistoryEntity>
+    )
 
     private fun applyFilters() {
         val state = _uiState.value

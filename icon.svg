@@ -2,8 +2,8 @@
   <!-- Background -->
   <rect width="108" height="108" fill="#7C3AED"/>
 
-  <!-- TV Icon -->
-  <g transform="translate(27, 27)">
+  <!-- TV Icon (scaled up) -->
+  <g transform="translate(14, 16) scale(1.5)">
     <!-- TV Body -->
     <path fill="#FFFFFF" d="M48,8H6C2.69,8 0,10.69 0,14V38C0,41.31 2.69,44 6,44H20V48H14V52H40V48H34V44H48C51.31,44 54,41.31 54,38V14C54,10.69 51.31,8 48,8ZM48,38H6V14H48V38Z"/>
 

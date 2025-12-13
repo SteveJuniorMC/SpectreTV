@@ -17,6 +17,8 @@ import com.spectretv.app.domain.model.SourceType
 import com.spectretv.app.domain.repository.LoadingProgress
 import com.spectretv.app.domain.repository.VodRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -116,26 +118,36 @@ class VodRepositoryImpl @Inject constructor(
             // Collect all movies in memory first (don't insert until done)
             val allEntities = mutableListOf<MovieEntity>()
 
-            // Fetch by category
-            categories.forEachIndexed { index, category ->
-                val categoryId = category.categoryId ?: return@forEachIndexed
-                val categoryName = category.categoryName ?: "Uncategorized"
+            // Divide into 4 batches for parallel fetching
+            val batchSize = maxOf(1, (categories.size + 3) / 4)
+            val batches = categories.chunked(batchSize)
 
+            batches.forEachIndexed { batchIndex, batch ->
                 onProgress(LoadingProgress(
-                    currentCategory = categoryName,
-                    categoriesLoaded = index,
+                    currentCategory = "Batch ${batchIndex + 1} of ${batches.size}",
+                    categoriesLoaded = batchIndex * batchSize,
                     totalCategories = totalCategories,
                     itemsLoaded = itemsLoaded
                 ))
 
-                val movies = xtreamClient.getMoviesByCategory(source, categoryId, categoryName)
-                val entities = movies.map { movie ->
-                    MovieEntity.fromDomain(
-                        movie.copy(isFavorite = existingFavorites.contains(movie.id))
+                // Fetch all categories in this batch in parallel
+                val batchResults = batch.map { category ->
+                    async {
+                        val categoryId = category.categoryId ?: return@async emptyList()
+                        val categoryName = category.categoryName ?: "Uncategorized"
+                        xtreamClient.getMoviesByCategory(source, categoryId, categoryName)
+                    }
+                }.awaitAll()
+
+                // Process results
+                batchResults.flatten().forEach { movie ->
+                    allEntities.add(
+                        MovieEntity.fromDomain(
+                            movie.copy(isFavorite = existingFavorites.contains(movie.id))
+                        )
                     )
+                    itemsLoaded++
                 }
-                allEntities.addAll(entities)
-                itemsLoaded += movies.size
             }
 
             // Now save all at once
@@ -291,26 +303,36 @@ class VodRepositoryImpl @Inject constructor(
             // Collect all series in memory first (don't insert until done)
             val allEntities = mutableListOf<SeriesEntity>()
 
-            // Fetch by category
-            categories.forEachIndexed { index, category ->
-                val categoryId = category.categoryId ?: return@forEachIndexed
-                val categoryName = category.categoryName ?: "Uncategorized"
+            // Divide into 4 batches for parallel fetching
+            val batchSize = maxOf(1, (categories.size + 3) / 4)
+            val batches = categories.chunked(batchSize)
 
+            batches.forEachIndexed { batchIndex, batch ->
                 onProgress(LoadingProgress(
-                    currentCategory = categoryName,
-                    categoriesLoaded = index,
+                    currentCategory = "Batch ${batchIndex + 1} of ${batches.size}",
+                    categoriesLoaded = batchIndex * batchSize,
                     totalCategories = totalCategories,
                     itemsLoaded = itemsLoaded
                 ))
 
-                val seriesList = xtreamClient.getSeriesByCategory(source, categoryId, categoryName)
-                val entities = seriesList.map { series ->
-                    SeriesEntity.fromDomain(
-                        series.copy(isFavorite = existingFavorites.contains(series.id))
+                // Fetch all categories in this batch in parallel
+                val batchResults = batch.map { category ->
+                    async {
+                        val categoryId = category.categoryId ?: return@async emptyList()
+                        val categoryName = category.categoryName ?: "Uncategorized"
+                        xtreamClient.getSeriesByCategory(source, categoryId, categoryName)
+                    }
+                }.awaitAll()
+
+                // Process results
+                batchResults.flatten().forEach { series ->
+                    allEntities.add(
+                        SeriesEntity.fromDomain(
+                            series.copy(isFavorite = existingFavorites.contains(series.id))
+                        )
                     )
+                    itemsLoaded++
                 }
-                allEntities.addAll(entities)
-                itemsLoaded += seriesList.size
             }
 
             // Now save all at once

@@ -10,6 +10,8 @@ import com.spectretv.app.domain.model.SourceType
 import com.spectretv.app.domain.repository.ChannelRepository
 import com.spectretv.app.domain.repository.LoadingProgress
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -146,26 +148,36 @@ class ChannelRepositoryImpl @Inject constructor(
                     // Collect all channels in memory first (don't insert until done)
                     val allEntities = mutableListOf<ChannelEntity>()
 
-                    // Fetch by category
-                    categories.forEachIndexed { index, category ->
-                        val categoryId = category.categoryId ?: return@forEachIndexed
-                        val categoryName = category.categoryName ?: "Uncategorized"
+                    // Divide into 4 batches for parallel fetching
+                    val batchSize = maxOf(1, (categories.size + 3) / 4)
+                    val batches = categories.chunked(batchSize)
 
+                    batches.forEachIndexed { batchIndex, batch ->
                         onProgress(LoadingProgress(
-                            currentCategory = categoryName,
-                            categoriesLoaded = index,
+                            currentCategory = "Batch ${batchIndex + 1} of ${batches.size}",
+                            categoriesLoaded = batchIndex * batchSize,
                             totalCategories = totalCategories,
                             itemsLoaded = itemsLoaded
                         ))
 
-                        val channels = xtreamClient.getChannelsByCategory(source, categoryId, categoryName)
-                        val entities = channels.map { channel ->
-                            ChannelEntity.fromDomain(
-                                channel.copy(isFavorite = existingFavorites.contains(channel.id))
+                        // Fetch all categories in this batch in parallel
+                        val batchResults = batch.map { category ->
+                            async {
+                                val categoryId = category.categoryId ?: return@async emptyList()
+                                val categoryName = category.categoryName ?: "Uncategorized"
+                                xtreamClient.getChannelsByCategory(source, categoryId, categoryName)
+                            }
+                        }.awaitAll()
+
+                        // Process results
+                        batchResults.flatten().forEach { channel ->
+                            allEntities.add(
+                                ChannelEntity.fromDomain(
+                                    channel.copy(isFavorite = existingFavorites.contains(channel.id))
+                                )
                             )
+                            itemsLoaded++
                         }
-                        allEntities.addAll(entities)
-                        itemsLoaded += channels.size
                     }
 
                     // Now save all at once

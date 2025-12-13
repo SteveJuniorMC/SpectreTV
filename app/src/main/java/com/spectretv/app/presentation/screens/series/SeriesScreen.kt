@@ -80,7 +80,8 @@ fun SeriesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showSearch by remember { mutableStateOf(false) }
+    // Show search bar if there's an active search query (persists across navigation)
+    var showSearch by remember { mutableStateOf(uiState.searchQuery.isNotEmpty()) }
     var showSortMenu by remember { mutableStateOf(false) }
     val gridState = rememberLazyGridState()
 

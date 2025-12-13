@@ -10,7 +10,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.spectretv.app"
+        applicationId = "com.spectretv.player"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

@@ -128,7 +128,13 @@ fun MoviesScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showSearch = !showSearch }) {
+                    IconButton(onClick = {
+                        if (showSearch) {
+                            // Closing search - clear the filter
+                            viewModel.setSearchQuery("")
+                        }
+                        showSearch = !showSearch
+                    }) {
                         Icon(
                             imageVector = if (showSearch) Icons.Default.Close else Icons.Default.Search,
                             contentDescription = if (showSearch) "Close search" else "Search"

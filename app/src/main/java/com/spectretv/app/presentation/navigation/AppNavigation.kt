@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -52,6 +53,7 @@ val bottomNavItems = listOf(
     BottomNavItem(Screen.Settings, Icons.Default.Settings, "Settings")
 )
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun AppNavigation(playerManager: PlayerManager) {
     val navController = rememberNavController()

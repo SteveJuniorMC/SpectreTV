@@ -15,8 +15,10 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -55,10 +57,18 @@ fun AppNavigation(playerManager: PlayerManager) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     val currentStream = playerManager.currentStream
     val isFullScreen = playerManager.isFullScreen
     val isPlaying = playerManager.isPlaying
+
+    // Hide keyboard when entering fullscreen
+    LaunchedEffect(isFullScreen) {
+        if (isFullScreen) {
+            keyboardController?.hide()
+        }
+    }
 
     // Hide bottom bar on detail screens
     val showBottomBar = currentDestination?.route?.let { route ->

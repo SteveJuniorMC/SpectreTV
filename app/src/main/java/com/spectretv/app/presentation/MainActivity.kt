@@ -62,9 +62,9 @@ class MainActivity : ComponentActivity() {
         newConfig: Configuration
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-        // When exiting PiP, minimize to mini player
+        // When exiting PiP, expand to full screen player
         if (!isInPictureInPictureMode && playerManager.currentStream != null) {
-            playerManager.minimize()
+            playerManager.expand()
         }
     }
 

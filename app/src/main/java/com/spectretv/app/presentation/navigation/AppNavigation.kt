@@ -64,6 +64,7 @@ fun AppNavigation(playerManager: PlayerManager) {
     val currentStream = playerManager.currentStream
     val isFullScreen = playerManager.isFullScreen
     val isPlaying = playerManager.isPlaying
+    val isInPipMode = playerManager.isInPipMode
 
     // Hide keyboard when entering fullscreen
     LaunchedEffect(isFullScreen) {
@@ -232,6 +233,7 @@ fun AppNavigation(playerManager: PlayerManager) {
                 exoPlayer = playerManager.exoPlayer,
                 isPlaying = isPlaying,
                 contentType = currentStream.contentType,
+                isInPipMode = isInPipMode,
                 onMinimize = {
                     // VOD content (movies/series) stops, live TV minimizes to mini player
                     if (currentStream.contentType == ContentType.VOD) {

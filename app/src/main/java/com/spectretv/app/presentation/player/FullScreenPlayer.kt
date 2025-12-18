@@ -187,6 +187,7 @@ fun FullScreenPlayer(
     exoPlayer: ExoPlayer?,
     isPlaying: Boolean,
     contentType: ContentType = ContentType.LIVE,
+    isInPipMode: Boolean = false,
     onMinimize: () -> Unit,
     onPlayPause: () -> Unit,
     onSeekTo: (Long) -> Unit = {},
@@ -198,6 +199,13 @@ fun FullScreenPlayer(
     val context = LocalContext.current
     val activity = context as? Activity
     var showControls by remember { mutableStateOf(true) }
+
+    // Hide controls when entering PiP mode
+    LaunchedEffect(isInPipMode) {
+        if (isInPipMode) {
+            showControls = false
+        }
+    }
     // Start with buffering true until we know the player is ready
     var isBuffering by remember { mutableStateOf(true) }
     var showTrackSelector by remember { mutableStateOf(false) }

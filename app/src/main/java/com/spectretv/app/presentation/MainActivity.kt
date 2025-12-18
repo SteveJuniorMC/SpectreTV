@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
             playerManager.isPlaying) {
 
             // Make sure player is in fullscreen mode for PiP (no UI controls)
+            playerManager.enterPipMode()
             playerManager.expand()
 
             val params = PictureInPictureParams.Builder()

@@ -48,6 +48,9 @@ class PlayerManager @Inject constructor(
     var isFullScreen by mutableStateOf(false)
         private set
 
+    var isInPipMode by mutableStateOf(false)
+        private set
+
     var isPlaying by mutableStateOf(false)
         private set
 
@@ -227,6 +230,15 @@ class PlayerManager @Inject constructor(
 
     fun expand() {
         isFullScreen = true
+        isInPipMode = false
+    }
+
+    fun enterPipMode() {
+        isInPipMode = true
+    }
+
+    fun exitPipMode() {
+        isInPipMode = false
     }
 
     fun retry() {

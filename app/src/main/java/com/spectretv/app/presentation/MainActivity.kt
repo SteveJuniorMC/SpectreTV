@@ -65,10 +65,16 @@ class MainActivity : ComponentActivity() {
         newConfig: Configuration
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-        // When exiting PiP, expand to full screen player and hide keyboard
+        // When exiting PiP
         if (!isInPictureInPictureMode && playerManager.currentStream != null) {
-            hideKeyboard()
-            playerManager.expand()
+            if (isFinishing) {
+                // PiP was dismissed (swiped away) - stop playback
+                playerManager.stop()
+            } else {
+                // User tapped to expand - go to fullscreen
+                hideKeyboard()
+                playerManager.expand()
+            }
         }
     }
 

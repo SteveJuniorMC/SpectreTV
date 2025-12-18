@@ -493,8 +493,8 @@ fun FullScreenPlayer(
             }
         }
 
-        // Controls overlay
-        if (showControls) {
+        // Controls overlay - never show in PiP mode
+        if (showControls && !isInPipMode) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

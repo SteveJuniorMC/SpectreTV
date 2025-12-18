@@ -54,6 +54,12 @@ class PlayerManager @Inject constructor(
     var isPlaying by mutableStateOf(false)
         private set
 
+    private var hideControlsCallback: (() -> Unit)? = null
+
+    fun setHideControlsCallback(callback: () -> Unit) {
+        hideControlsCallback = callback
+    }
+
     private var _exoPlayer: ExoPlayer? = null
     val exoPlayer: ExoPlayer?
         get() = _exoPlayer
@@ -234,6 +240,7 @@ class PlayerManager @Inject constructor(
     }
 
     fun enterPipMode() {
+        hideControlsCallback?.invoke()
         isInPipMode = true
     }
 

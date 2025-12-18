@@ -194,11 +194,17 @@ fun FullScreenPlayer(
     onSkipForward: () -> Unit = {},
     onSkipBackward: () -> Unit = {},
     onRetry: () -> Unit = {},
+    onHideControlsCallback: ((() -> Unit) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
     var showControls by remember { mutableStateOf(true) }
+
+    // Provide callback to hide controls immediately
+    LaunchedEffect(Unit) {
+        onHideControlsCallback?.invoke { showControls = false }
+    }
 
     // Hide controls when entering PiP mode
     LaunchedEffect(isInPipMode) {

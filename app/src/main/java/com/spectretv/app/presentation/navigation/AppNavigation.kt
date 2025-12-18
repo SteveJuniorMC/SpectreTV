@@ -234,6 +234,7 @@ fun AppNavigation(playerManager: PlayerManager) {
                 isPlaying = isPlaying,
                 contentType = currentStream.contentType,
                 isInPipMode = isInPipMode,
+                onHideControlsCallback = { callback -> playerManager.setHideControlsCallback(callback) },
                 onMinimize = {
                     // VOD content (movies/series) stops, live TV minimizes to mini player
                     if (currentStream.contentType == ContentType.VOD) {

@@ -132,6 +132,7 @@ fun AppNavigation(playerManager: PlayerManager) {
                 composable(Screen.Live.route) {
                     LiveScreen(
                         onChannelClick = { channel ->
+                            keyboardController?.hide()
                             playerManager.play(
                                 url = channel.streamUrl,
                                 title = channel.name,
@@ -160,6 +161,7 @@ fun AppNavigation(playerManager: PlayerManager) {
                     MovieDetailScreen(
                         onBackClick = { navController.popBackStack() },
                         onPlayClick = { movie ->
+                            keyboardController?.hide()
                             playerManager.play(
                                 url = movie.streamUrl,
                                 title = movie.name,
@@ -170,6 +172,7 @@ fun AppNavigation(playerManager: PlayerManager) {
                             )
                         },
                         onResumeClick = { movie, position ->
+                            keyboardController?.hide()
                             playerManager.play(
                                 url = movie.streamUrl,
                                 title = movie.name,
@@ -200,6 +203,7 @@ fun AppNavigation(playerManager: PlayerManager) {
                     SeriesDetailScreen(
                         onBackClick = { navController.popBackStack() },
                         onEpisodeClick = { episode, seriesName ->
+                            keyboardController?.hide()
                             playerManager.play(
                                 url = episode.streamUrl,
                                 title = episode.name,

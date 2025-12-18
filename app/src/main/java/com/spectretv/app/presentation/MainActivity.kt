@@ -65,16 +65,19 @@ class MainActivity : ComponentActivity() {
         newConfig: Configuration
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-        // When exiting PiP
+        playerManager.exitPipMode()
+        // When exiting PiP by tapping to expand
         if (!isInPictureInPictureMode && playerManager.currentStream != null) {
-            if (isFinishing) {
-                // PiP was dismissed (swiped away) - stop playback
-                playerManager.stop()
-            } else {
-                // User tapped to expand - go to fullscreen
-                hideKeyboard()
-                playerManager.expand()
-            }
+            hideKeyboard()
+            playerManager.expand()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // If we're in PiP mode and activity is stopping, PiP was dismissed
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode) {
+            playerManager.stop()
         }
     }
 

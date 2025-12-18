@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -60,6 +61,7 @@ fun AppNavigation(playerManager: PlayerManager) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
     val currentStream = playerManager.currentStream
     val isFullScreen = playerManager.isFullScreen
@@ -133,6 +135,7 @@ fun AppNavigation(playerManager: PlayerManager) {
                 composable(Screen.Live.route) {
                     LiveScreen(
                         onChannelClick = { channel ->
+                            focusManager.clearFocus()
                             keyboardController?.hide()
                             playerManager.play(
                                 url = channel.streamUrl,
@@ -162,6 +165,7 @@ fun AppNavigation(playerManager: PlayerManager) {
                     MovieDetailScreen(
                         onBackClick = { navController.popBackStack() },
                         onPlayClick = { movie ->
+                            focusManager.clearFocus()
                             keyboardController?.hide()
                             playerManager.play(
                                 url = movie.streamUrl,
@@ -173,6 +177,7 @@ fun AppNavigation(playerManager: PlayerManager) {
                             )
                         },
                         onResumeClick = { movie, position ->
+                            focusManager.clearFocus()
                             keyboardController?.hide()
                             playerManager.play(
                                 url = movie.streamUrl,
@@ -204,6 +209,7 @@ fun AppNavigation(playerManager: PlayerManager) {
                     SeriesDetailScreen(
                         onBackClick = { navController.popBackStack() },
                         onEpisodeClick = { episode, seriesName ->
+                            focusManager.clearFocus()
                             keyboardController?.hide()
                             playerManager.play(
                                 url = episode.streamUrl,
